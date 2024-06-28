@@ -9,15 +9,16 @@ const needFreeze = (o : any) =>  o && typeof o === 'object' && !Object.isFrozen(
 
 /**
  * Deep freeze an object
+ * * do not use it to freeze object with circular references
  */
 export function deepFreeze<R extends any>(o: R): Readonly<R> {
   if (!needFreeze(o)) return o;
   Object.freeze(o);
   Object.getOwnPropertyNames(o).forEach(function (prop) {
     // @ts-expect-error fix types
-    if (!o.hasOwnProperty(prop) || !needFreeze(o[prop])) return
+    if (!o.hasOwnProperty(prop) || !needFreeze(o[prop])) return;
     const descriptor = Object.getOwnPropertyDescriptor(o, prop);
-    if (descriptor && (descriptor.get || descriptor.set)) return
+    if (descriptor && (descriptor.get || descriptor.set)) return;
     // @ts-expect-error fix types
     deepFreeze(o[prop]);
   });

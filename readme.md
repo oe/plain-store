@@ -4,7 +4,10 @@
     <img src="https://github.com/oe/template-to-react/actions/workflows/build.yml/badge.svg" alt="Github Workflow">
   </a>
   <a href="#readme">
-    <img src="https://badges.frapsoft.com/typescript/code/typescript.svg?v=101" alt="code with typescript" height="20">
+    <img src="https://img.shields.io/badge/%3C%2F%3E-typescript-blue" alt="code with typescript" height="20">
+  </a>
+  <a href="#readme">
+    <img src="https://img.shields.io/badge/coverage-100%25-44CC11" alt="code coverage" height="20">
   </a>
   <a href="#readme">
     <img src="https://badge.fury.io/js/plain-store.svg" alt="npm version" height="20">
@@ -13,7 +16,7 @@
     <img src="https://img.shields.io/npm/dm/plain-store.svg" alt="npm version" height="20">
   </a>
 </div>
-A dead simple immutable store for react to manage state in your application, redux alternative in less than 1kb.
+A dead simple immutable store for react to manage state in your application, redux alternative in less than 1kb gzipped.
 
 ## Installation
 ```bash
@@ -46,7 +49,7 @@ function Counter() {
   );
 }
 
-store.getStore(); // { count: 1 }, will trigger Counter re-render
+store.getStore(); // { count: 1 }
 store.setStore((prev) => ({ count: 2 + prev.count })); // { count: 3 }, will trigger Counter re-render
 ```
 

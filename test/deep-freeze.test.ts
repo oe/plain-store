@@ -26,10 +26,22 @@ describe('deepFreeze', () => {
     }).toThrow();
     expect(Object.isFrozen(frozenArr)).toBe(true);
   });
+
   it('freezes an object has getter', () => {
+    // @ts-expect-error Testing immutability
+    const obj = { a: 1, get b() { return {a: 2}; }, set c(a) { return 2  } };
+    const frozenArr = deepFreeze(obj);
+    expect(Object.isFrozen(frozenArr.c)).toBe(true);
+  });
+
+  it('when Object.getOwnPropertyDescriptor not available', () => {
+    const existing = Object.getOwnPropertyDescriptor;
+    Object.getOwnPropertyDescriptor = () => undefined;
+
     const obj = { a: 1, get b() { return 2; }, c: {  set() {}} };
     const frozenArr = deepFreeze(obj);
-    expect(Object.isFrozen(frozenArr)).toBe(true);
+    expect(Object.isFrozen(frozenArr.c)).toBe(true);
+    Object.getOwnPropertyDescriptor = existing
   });
 
   it('deep freezes an object', () => {

@@ -12,6 +12,14 @@
     "test": "vitest",
     "prepublish": "yarn test && yarn build"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oe/plain-store"
+  },
+  "author": {
+    "name": "Saiya",
+    "email": "me@evecalm.com"
+  },
   "files": [
     "dist"
   ],
