@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createStore } from '../src/index';
 import { renderHook } from '@testing-library/react-hooks';
+import { render, screen } from '@testing-library/react';
 
 describe('createStore', () => {
   it('should initialize the store with the initial value', () => {
@@ -61,12 +62,15 @@ describe('createStore', () => {
 
   it('should not update the selector value if the store value does not change', () => {
     const store = createStore(10);
-    const { result } = renderHook(() => store.useSelect((value) => value * 2));
+    const { result, unmount } = renderHook(() => store.useSelect((value) => value * 2));
     expect(result.current).toBe(20);
 
     store.setStore(10);
     expect(result.current).toBe(20);
     store.setStore(6);
+    expect(result.current).toBe(12);
+    unmount();
+    store.setStore(12);
     expect(result.current).toBe(12);
   });
 
@@ -77,5 +81,34 @@ describe('createStore', () => {
 
     store.setStore('abc');
     expect(result.current).toBe(3);
+  });
+
+  it('check useSelect render times', () => {
+    const store = createStore('xxx');
+    let renderCount = 0
+    const { result } = renderHook(() => {
+      renderCount++;
+      return store.useSelect((value) => value.length)
+    });
+    expect(renderCount).toBe(1);
+    expect(result.current).toBe(3);
+    store.setStore('abc');
+    expect(renderCount).toBe(1);
+    expect(result.current).toBe(3);
+    store.setStore('abcd');
+    expect(renderCount).toBe(2);
+    expect(result.current).toBe(4);
+  });
+
+  it('check render effect', async () => {
+    const store = createStore('xxx');
+    const TestComponent = () => {
+      const val = store.useSelect((value) => value.length)
+      return <div data-testid="div">{val}</div>
+    }
+    render(<TestComponent />)
+
+    const result = await screen.getByTestId('div')
+    expect(result.innerHTML).toBe('3');
   });
 });

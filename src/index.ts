@@ -91,15 +91,17 @@ export function createStore<T>(initialValue: IInitialState<T>) {
       const [data, setData] = useState(converter(value))
       useEffect(() => {
         const listener = (value: T) => {
-          const nextData = converter(value)
-          if (isDeepEqual(data, nextData)) return;
-          setData(nextData)
+          setData((prev) => {
+            const nextData = converter(value)
+            if (isDeepEqual(prev, nextData)) return prev;
+            return deepFreeze(nextData)
+          })
         }
         listeners.add(listener)
         return () => {
           listeners.delete(listener)
         }
-      }, [data])
+      }, [])
       return data;
     },
   };

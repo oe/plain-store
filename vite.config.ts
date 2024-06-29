@@ -1,12 +1,13 @@
 /// <reference types="vitest" />
-
 import { defineConfig } from 'vite'
 import dts from 'vite-plugin-dts'
 
 export default defineConfig({
   test: {
     watch: false,
-    include: ['test/**/*.test.ts'],
+    globals: true,
+    environment: "jsdom",
+    include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],
     exclude: ['example/**'],
     coverage: {
       exclude: ['example/**', 'test/coverage/**'],
