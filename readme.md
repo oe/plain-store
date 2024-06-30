@@ -27,6 +27,7 @@ yarn add plain-store
 ```
 
 ## Usage
+using with bundler or es module
 ```javascript
 import { createStore, isDeepEqual, deepFreeze } from 'plain-store';
 
@@ -52,6 +53,18 @@ function Counter() {
 store.getStore(); // { count: 1 }
 store.setStore((prev) => ({ count: 2 + prev.count })); // { count: 3 }, will trigger Counter re-render
 ```
+
+using with script tag
+```html
+<!-- include react -->
+<script src="https://cdn.jsdelivr.net/npm/react/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/plain-store/dist/index.iife.js"></script>
+<script>
+  const { createStore, isDeepEqual, deepFreeze } = PlainStore;
+  const store = createStore({ count: 0 });
+  store.setStore({ count: 1 });
+</script>
+
 
 ## API
 ### createStore(initialState)

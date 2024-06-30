@@ -16,9 +16,9 @@ export default defineConfig({
   build: {
     lib: {
       entry: 'src/index.ts',
-      name: 'useStore',
+      name: 'PlainStore',
       formats: ['es','umd', 'iife'],
-      fileName: 'index',
+      fileName: (format) => `index${format === 'es' ? '' : `.${format}`}.js`
     },
     rollupOptions: {
       external: ['react'],
