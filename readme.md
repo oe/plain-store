@@ -64,7 +64,7 @@ using with script tag
   const store = createStore({ count: 0 });
   store.setStore({ count: 1 });
 </script>
-
+```
 
 ## API
 ### createStore(initialState)
