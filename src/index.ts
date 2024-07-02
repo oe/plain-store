@@ -49,6 +49,24 @@ export function createStore<T>(initialValue: IInitialState<T>) {
   let value = deepFreeze<T>(typeof initialValue === 'function' ? initialValue() : initialValue);
   const listeners = new Set<(value: T) => void>();
 
+  const useSelector = <R>(converter: (value: T) => R) => {
+    const [data, setData] = useState(converter(value))
+    useEffect(() => {
+      const listener = (value: T) => {
+        setData((prev) => {
+          const nextData = converter(value)
+          if (isDeepEqual(prev, nextData)) return prev;
+          return deepFreeze(nextData)
+        })
+      }
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    }, [])
+    return data;
+  }
+
   return {
     /**
      * use the store, get the whole store value and re-render when the store value changes
@@ -87,22 +105,12 @@ export function createStore<T>(initialValue: IInitialState<T>) {
      * create a selector for the store, re-render when the store value changes
      * @param converter convert the store value to a new value
      */
-    useSelect<R>(converter: (value: T) => R) {
-      const [data, setData] = useState(converter(value))
-      useEffect(() => {
-        const listener = (value: T) => {
-          setData((prev) => {
-            const nextData = converter(value)
-            if (isDeepEqual(prev, nextData)) return prev;
-            return deepFreeze(nextData)
-          })
-        }
-        listeners.add(listener)
-        return () => {
-          listeners.delete(listener)
-        }
-      }, [])
-      return data;
-    },
-  };
+    useSelector,
+    /**
+     * create a selector for the store, get the latest store value without reactive
+     * @deprecated use `useSelector` instead
+     * @param converter convert the store value to a new value
+     */
+    useSelect: useSelector,
+  }
 }

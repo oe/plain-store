@@ -103,7 +103,7 @@ describe('createStore', () => {
   it('check render effect', async () => {
     const store = createStore('xxx');
     const TestComponent = () => {
-      const val = store.useSelect((value) => value.length)
+      const val = store.useSelector((value) => value.length)
       return <div data-testid="div">{val}</div>
     }
     render(<TestComponent />)

@@ -40,7 +40,7 @@ store.setStore({ count: 1 });
 
 function Counter() {
   const { count } = store.useStore();
-  const doubled = store.useSelect((state) => state.count * 2);
+  const doubled = store.useSelector((state) => state.count * 2);
   return (
     <div>
       <div>count: {count}</div>
@@ -80,7 +80,7 @@ interface IStore<T> {
   // react hook to get the current state of the store.
   useStore: () => Readonly<T>;
   // react hook to select a part of the state.
-  useSelect: <R>(selector: (state: T) => R) => R;
+  useSelector: <R>(selector: (state: T) => R) => R;
 }
 function createStore<T>(initialState: T | (() => T)): IStore<T>;
 ```
