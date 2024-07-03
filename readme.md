@@ -72,7 +72,7 @@ using with script tag
 ```
 
 ## API
-### createStore(initialState)
+### createStore(initialState, options?)
 Create a store with the initial state.
 ```ts
 import { createStore } from 'plain-store';
