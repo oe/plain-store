@@ -77,11 +77,11 @@ Create a store with the initial state.
 ```ts
 import { createStore } from 'plain-store';
 
-interface ICreateStoreOptions {
+interface ICreateStoreOptions<T> {
   /**
    * listen to the store value changes
    */
-  onChange?: (value: any) => void;
+  onChange?: (value: T) => void;
 }
 
 interface IStore<T> {
@@ -94,7 +94,7 @@ interface IStore<T> {
   // react hook to select a part of the state.
   useSelector: <R>(selector: (state: T) => R) => R;
 }
-function createStore<T>(initialState: T | (() => T), options?: ICreateStoreOptions): IStore<T>;
+function createStore<T>(initialState: T | (() => T), options?: ICreateStoreOptions<T>): IStore<T>;
 ```
 
 Note: the store value is immutable(freezed by Object.freeze), do not mutate the store value directly or an error will be thrown.

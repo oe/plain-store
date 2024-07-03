@@ -115,7 +115,7 @@ describe('createStore', () => {
   it('check onChange', async () => {
     let changed = 0
     const store = createStore('xxx', {
-      onChange(value) {
+      onChange() {
         changed++
       }
     });

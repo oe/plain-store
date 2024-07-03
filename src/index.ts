@@ -48,19 +48,18 @@ const noop = () => {}
 /**
  * options for creating a store
  */
-export interface ICreateStoreOptions {
+export interface ICreateStoreOptions<T> {
   /**
    * listen to the store value changes
    */
-  onChange?: (value: any) => void;
+  onChange?: (value: T) => void;
 }
 
 /**
  * create a store for state management
  * @param initialValue initial value of the store
  */
-export function createStore<T>(initialValue: IInitialState<T>, options?: ICreateStoreOptions) {
-
+export function createStore<T>(initialValue: IInitialState<T>, options?: ICreateStoreOptions<T>) {
   const { onChange = noop } = options || {}
   // @ts-expect-error fix types
   let value = deepFreeze<T>(typeof initialValue === 'function' ? initialValue() : initialValue);
