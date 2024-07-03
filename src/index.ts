@@ -41,10 +41,27 @@ export function isDeepEqual(a: any, b: any) {
 }
 
 /**
+ * noop function, for default callback
+ */
+const noop = () => {}
+
+/**
+ * options for creating a store
+ */
+export interface ICreateStoreOptions {
+  /**
+   * listen to the store value changes
+   */
+  onChange?: (value: any) => void;
+}
+
+/**
  * create a store for state management
  * @param initialValue initial value of the store
  */
-export function createStore<T>(initialValue: IInitialState<T>) {
+export function createStore<T>(initialValue: IInitialState<T>, options?: ICreateStoreOptions) {
+
+  const { onChange = noop } = options || {}
   // @ts-expect-error fix types
   let value = deepFreeze<T>(typeof initialValue === 'function' ? initialValue() : initialValue);
   const listeners = new Set<(value: T) => void>();
@@ -100,6 +117,7 @@ export function createStore<T>(initialValue: IInitialState<T>) {
       if (isDeepEqual(value, nextValue)) return;
       value = deepFreeze<T>(nextValue);
       listeners.forEach(listener => listener(value));
+      onChange(value)
     },
     /**
      * create a selector for the store, re-render when the store value changes

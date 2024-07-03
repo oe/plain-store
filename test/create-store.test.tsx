@@ -111,4 +111,16 @@ describe('createStore', () => {
     const result = await screen.getByTestId('div')
     expect(result.innerHTML).toBe('3');
   });
+
+  it('check onChange', async () => {
+    let changed = 0
+    const store = createStore('xxx', {
+      onChange(value) {
+        changed++
+      }
+    });
+    expect(changed).toBe(0);
+    store.setStore('abc');
+    expect(changed).toBe(1);
+  });
 });

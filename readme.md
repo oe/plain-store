@@ -24,6 +24,7 @@ A dead simple immutable store for react to manage state in your application, red
 npm install plain-store
 # yarn
 yarn add plain-store
+
 ```
 
 ## Usage
@@ -61,7 +62,11 @@ using with script tag
 <script src="https://cdn.jsdelivr.net/npm/plain-store/dist/index.iife.js"></script>
 <script>
   const { createStore, isDeepEqual, deepFreeze } = PlainStore;
-  const store = createStore({ count: 0 });
+  const store = createStore({ count: 0 }, {
+    onChange: (value) => {
+      console.log('store value changed', value);
+    }
+  });
   store.setStore({ count: 1 });
 </script>
 ```
@@ -71,6 +76,13 @@ using with script tag
 Create a store with the initial state.
 ```ts
 import { createStore } from 'plain-store';
+
+interface ICreateStoreOptions {
+  /**
+   * listen to the store value changes
+   */
+  onChange?: (value: any) => void;
+}
 
 interface IStore<T> {
   // Get the current state of the store, none reactive, could be used anywhere.
@@ -82,7 +94,7 @@ interface IStore<T> {
   // react hook to select a part of the state.
   useSelector: <R>(selector: (state: T) => R) => R;
 }
-function createStore<T>(initialState: T | (() => T)): IStore<T>;
+function createStore<T>(initialState: T | (() => T), options?: ICreateStoreOptions): IStore<T>;
 ```
 
 Note: the store value is immutable(freezed by Object.freeze), do not mutate the store value directly or an error will be thrown.
