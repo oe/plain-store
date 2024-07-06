@@ -40,6 +40,15 @@ export function isDeepEqual(a: any, b: any) {
   return true;
 }
 
+
+/**
+ * Check if a value is a promise
+ */
+export function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+  // @ts-expect-error fix types
+  return value instanceof Promise || (value && typeof value.then === 'function')
+}
+
 /**
  * noop function, for default callback
  */
@@ -83,6 +92,26 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
     return data;
   }
 
+  function setStore(cb: (prev: T) => Promise<T>): Promise<void>
+  function setStore(newValue: T | ((prev: T) => T)): void
+  function setStore(newValue: T | ((prev: T) => (T | Promise<T>))) {
+    // @ts-expect-error fix types
+    const nextValue = typeof newValue === 'function' ? newValue(value) : newValue
+
+    const dealWithNewValue = (nextValue: T) => {
+      if (isDeepEqual(value, nextValue)) return;
+      value = deepFreeze<T>(nextValue);
+      listeners.forEach(listener => listener(value));
+      onChange(value)
+    }
+    // not using await to avoid async/await in the callback, which will cause async everywhere
+    if (isPromiseLike(nextValue)) {
+      return nextValue.then((value) => dealWithNewValue(value))
+    } else {
+      dealWithNewValue(nextValue)
+    }
+  }
+
   return {
     /**
      * use the store, get the whole store value and re-render when the store value changes
@@ -108,16 +137,10 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
     /**
      * update the store value, can be called outside react component lifecycle
      * @param newValue the new value to set, or a function that takes the previous value and returns the new value
-     * @returns 
+     * * use getStore() to get the latest state of the store when using async function
+     * @returns a promise if the new value is a async function, otherwise void
      */
-    setStore(newValue: T | ((prev: T) => T)) {
-      // @ts-expect-error fix types
-      const nextValue = typeof newValue === 'function' ? newValue(value) : newValue
-      if (isDeepEqual(value, nextValue)) return;
-      value = deepFreeze<T>(nextValue);
-      listeners.forEach(listener => listener(value));
-      onChange(value)
-    },
+    setStore,
     /**
      * create a selector for the store, re-render when the store value changes
      * @param converter convert the store value to a new value

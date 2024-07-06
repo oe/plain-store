@@ -3,6 +3,8 @@ import { createStore } from '../src/index';
 import { renderHook } from '@testing-library/react-hooks';
 import { render, screen } from '@testing-library/react';
 
+const waitFor = (time = 0) => new Promise((resolve) => setTimeout(resolve, time));
+
 describe('createStore', () => {
   it('should initialize the store with the initial value', () => {
     const store = createStore(10);
@@ -121,6 +123,25 @@ describe('createStore', () => {
     });
     expect(changed).toBe(0);
     store.setStore('abc');
+    expect(changed).toBe(1);
+  });
+
+  it('async onChange', async () => {
+    let changed = 0
+    const store = createStore('xxx', {
+      onChange() {
+        changed++
+      }
+    });
+    expect(changed).toBe(0);
+
+    const updateAsync = async () => {
+      await waitFor(1000)
+      return 'efg'
+    }
+    store.setStore(updateAsync);
+    expect(changed).toBe(0);
+    await waitFor(1000)
     expect(changed).toBe(1);
   });
 });

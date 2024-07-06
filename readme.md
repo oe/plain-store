@@ -87,8 +87,10 @@ interface ICreateStoreOptions<T> {
 interface IStore<T> {
   // Get the current state of the store, none reactive, could be used anywhere.
   getStore: () => Readonly<T>;
-  // Set the state of the store, could be used anywhere.
-  setStore: (state: T | ((prev: T) => T)) => void;
+  // Set the state of the store, could be used anywhere, callback could be async.
+  // * return a promise if the params is async function
+  // * use getStore() to get the latest state of the store when using async function
+  setStore: (state: T | ((prev: T) => T | Promise<T>)) => void | Promise<void>;
   // react hook to get the current state of the store.
   useStore: () => Readonly<T>;
   // react hook to select a part of the state.
@@ -104,17 +106,25 @@ store.setStore((prev) => ({ ...prev, newItem: 'xxx' }))
 ```
 
 ### isDeepEqual(a, b)
-Check if two values are deeply equal.
+Check if two values are deeply equal
 ```ts
 import { isDeepEqual } from 'plain-store';
 function isDeepEqual(a: any, b: any): boolean;
 ```
 
 ### deepFreeze(obj)
-Freeze an object deeply.
+Freeze an object deeply
 ```ts
 import { deepFreeze } from 'plain-store';
 function deepFreeze(obj: any): any;
+```
+
+### isPromiseLike(obj)
+Check if a value is a promise
+
+```ts
+import { isPromiseLike } from 'plain-store';
+function isPromiseLike(obj: any): boolean;
 ```
 
 ## License
