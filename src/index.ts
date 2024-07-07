@@ -71,11 +71,11 @@ export interface ICreateStoreOptions<T> {
 export function createStore<T>(initialValue: IInitialState<T>, options?: ICreateStoreOptions<T>) {
   const { onChange = noop } = options || {}
   // @ts-expect-error fix types
-  let value = deepFreeze<T>(typeof initialValue === 'function' ? initialValue() : initialValue);
+  let currentValue = deepFreeze<T>(typeof initialValue === 'function' ? initialValue() : initialValue);
   const listeners = new Set<(value: T) => void>();
 
   const useSelector = <R>(converter: (value: T) => R) => {
-    const [data, setData] = useState(converter(value))
+    const [data, setData] = useState(converter(currentValue))
     useEffect(() => {
       const listener = (value: T) => {
         setData((prev) => {
@@ -96,17 +96,17 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
   function setStore(newValue: T | ((prev: T) => T)): void
   function setStore(newValue: T | ((prev: T) => (T | Promise<T>))) {
     // @ts-expect-error fix types
-    const nextValue = typeof newValue === 'function' ? newValue(value) : newValue
+    const nextValue = typeof newValue === 'function' ? newValue(currentValue) : newValue
 
     const dealWithNewValue = (nextValue: T) => {
-      if (isDeepEqual(value, nextValue)) return;
-      value = deepFreeze<T>(nextValue);
-      listeners.forEach(listener => listener(value));
-      onChange(value)
+      if (isDeepEqual(currentValue, nextValue)) return;
+      currentValue = deepFreeze<T>(nextValue);
+      listeners.forEach(listener => listener(currentValue));
+      onChange(currentValue)
     }
     // not using await to avoid async/await in the callback, which will cause async everywhere
     if (isPromiseLike(nextValue)) {
-      return nextValue.then((value) => dealWithNewValue(value))
+      return nextValue.then(dealWithNewValue)
     } else {
       dealWithNewValue(nextValue)
     }
@@ -126,13 +126,13 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
           listeners.delete(listener)
         }
       }, [])
-      return value
+      return currentValue
     },
     /**
      * get the latest store value without reactive, can be used outside react component lifecycle
      */
     getStore() {
-      return value;
+      return currentValue;
     },
     /**
      * update the store value, can be called outside react component lifecycle
