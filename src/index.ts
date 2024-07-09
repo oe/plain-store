@@ -13,7 +13,6 @@ const needFreeze = (o : any) =>  o && typeof o === 'object' && !Object.isFrozen(
  */
 export function deepFreeze<R extends any>(o: R): Readonly<R> {
   if (!needFreeze(o)) return o;
-  Object.freeze(o);
   Object.getOwnPropertyNames(o).forEach(function (prop) {
     // @ts-expect-error fix types
     if (!o.hasOwnProperty(prop) || !needFreeze(o[prop])) return;
@@ -22,17 +21,31 @@ export function deepFreeze<R extends any>(o: R): Readonly<R> {
     // @ts-expect-error fix types
     deepFreeze(o[prop]);
   });
-  return o;
+  return Object.freeze(o);
 }
+
+const globalObject: any = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof self !== 'undefined' ? self : {}
+/** env builtin Objects */
+const ITERABLE_TYPES = [Object, Array, globalObject.Uint8Array, globalObject.Uint8ClampedArray, globalObject.Uint16Array, globalObject.Uint32Array, globalObject.Int8Array, globalObject.Int16Array, globalObject.Int32Array, globalObject.Float32Array, globalObject.Float64Array, globalObject.BigInt64Array, globalObject.BigUint64Array].filter(Boolean)
 
 /**
  * Deep compare two values
  */
 export function isDeepEqual(a: any, b: any) {
   if (a === b) return true;
-  if (Number.isNaN(a) && Number.isNaN(b)) return true;
-  if (typeof a !== 'object' || typeof b !== 'object') return false;
-  if (a === null || b === null) return false;
+  // for NaN
+  if (a !== a && b !== b) return true;
+  if (a == null || b == null) return false;
+  const constructor = a.constructor
+  // not same type, or is a function
+  if (constructor !== b.constructor || constructor === Function) return false;
+  if (constructor === Date) return a.getTime() === b.getTime();
+  if (constructor === RegExp) return a.toString() === b.toString();
+  if (constructor === Map || constructor === Set) return isDeepEqual(Array.from(a), Array.from(b));
+  // primitive types
+  if (constructor === String || constructor === Number || constructor === Boolean) return a.valueOf() === b.valueOf();
+  // not supported iterable types
+  if (!ITERABLE_TYPES.includes(constructor)) return false;
   if (Object.keys(a).length !== Object.keys(b).length) return false;
   for (const key in a) {
     if (!isDeepEqual(a[key], b[key])) return false;
@@ -62,6 +75,12 @@ export interface ICreateStoreOptions<T> {
    * listen to the store value changes
    */
   onChange?: (value: T) => void;
+  /**
+   * custom comparator for store value changes, default to `isDeepEqual`
+   *  * use it when the default comparator is not working as expected
+   *  * `isDeepEqual` works for most cases, but it's not perfect, you can provide a custom comparator to handle the edge cases or performance issues.
+   */
+  comparator?: (a: any, b: any) => boolean;
 }
 
 /**
@@ -69,7 +88,7 @@ export interface ICreateStoreOptions<T> {
  * @param initialValue initial value of the store
  */
 export function createStore<T>(initialValue: IInitialState<T>, options?: ICreateStoreOptions<T>) {
-  const { onChange = noop } = options || {}
+  const { onChange = noop, comparator = isDeepEqual } = options || {}
   // @ts-expect-error fix types
   let currentValue = deepFreeze<T>(typeof initialValue === 'function' ? initialValue() : initialValue);
   const listeners = new Set<(value: T) => void>();
@@ -80,7 +99,7 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
       const listener = (value: T) => {
         setData((prev) => {
           const nextData = converter(value)
-          if (isDeepEqual(prev, nextData)) return prev;
+          if (comparator(prev, nextData)) return prev;
           return deepFreeze(nextData)
         })
       }
@@ -99,7 +118,7 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
     const nextValue = typeof newValue === 'function' ? newValue(currentValue) : newValue
 
     const dealWithNewValue = (nextValue: T) => {
-      if (isDeepEqual(currentValue, nextValue)) return;
+      if (comparator(currentValue, nextValue)) return;
       currentValue = deepFreeze<T>(nextValue);
       listeners.forEach(listener => listener(currentValue));
       onChange(currentValue)

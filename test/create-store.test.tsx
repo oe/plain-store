@@ -144,4 +144,41 @@ describe('createStore', () => {
     await waitFor(1000)
     expect(changed).toBe(1);
   });
+
+  it('without custom comparator', async () => {
+    let changed = 0
+    const store = createStore(1, {
+      onChange() {
+        ++changed
+      },
+    });
+
+    store.setStore(2);
+    expect(changed).toBe(1);
+    store.setStore(NaN);
+    expect(changed).toBe(2);
+    store.setStore(NaN);
+    expect(changed).toBe(2);
+    store.setStore(NaN);
+    expect(changed).toBe(2);
+  })
+  it('custom comparator', async () => {
+    const comparator = (a: any, b: any) => a === b
+    let changed = 0
+    const store = createStore(1, {
+      onChange() {
+        ++changed
+      },
+      comparator
+    });
+
+    store.setStore(2);
+    expect(changed).toBe(1);
+    store.setStore(NaN);
+    expect(changed).toBe(2);
+    store.setStore(NaN);
+    expect(changed).toBe(3);
+    store.setStore(NaN);
+    expect(changed).toBe(4);
+  })
 });

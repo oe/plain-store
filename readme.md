@@ -82,6 +82,12 @@ interface ICreateStoreOptions<T> {
    * listen to the store value changes
    */
   onChange?: (value: T) => void;
+  /**
+   * custom comparator for store value changes, default to `isDeepEqual`
+   * * use it when the default comparator is not working as expected
+   * * `isDeepEqual` works for most cases, but it's not perfect, you can provide a custom comparator to handle the edge cases or performance issues.
+   */
+  comparator?: (a: any, b: any) => boolean;
 }
 
 interface IStore<T> {
@@ -99,14 +105,16 @@ interface IStore<T> {
 function createStore<T>(initialState: T | (() => T), options?: ICreateStoreOptions<T>): IStore<T>;
 ```
 
-Note: the store value is immutable(freezed by Object.freeze), do not mutate the store value directly or an error will be thrown.
+> [!WARNING]
+> The store value is immutable(freezed by Object.freeze), do not mutate the store value directly or an error will be thrown.
+
 ```ts
 // always use a new object to update the store value
 store.setStore((prev) => ({ ...prev, newItem: 'xxx' }))
 ```
 
 ### isDeepEqual(a, b)
-Check if two values are deeply equal
+Check if two values are deeply equal, can efficiently compare common data structures like objects, arrays, regexp, date and primitives.
 ```ts
 import { isDeepEqual } from 'plain-store';
 function isDeepEqual(a: any, b: any): boolean;
