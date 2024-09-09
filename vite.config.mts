@@ -2,6 +2,7 @@
 import { defineConfig } from 'vite'
 import dts from 'vite-plugin-dts'
 
+// @ts-expect-error fix vitest type
 export default defineConfig((env) => {
   if (env.mode === 'development') {
     return {
@@ -20,6 +21,7 @@ export default defineConfig((env) => {
     }
   }
   return {
+    root: './',
     test: {
       watch: false,
       globals: true,
@@ -31,11 +33,12 @@ export default defineConfig((env) => {
       },
     },
     build: {
+      outDir: 'dist',
       lib: {
         entry: 'src/index.ts',
         name: 'PlainStore',
-        formats: ['es','umd', 'iife'],
-        fileName: (format) => `index${format === 'es' ? '' : `.${format}`}.js`
+        formats: ['esm','cjs', 'iife'],
+        fileName: (format) => `${format}/index.js`
       },
       rollupOptions: {
         external: ['react'],
@@ -48,7 +51,9 @@ export default defineConfig((env) => {
     },
     plugins: [
       dts({
-        rollupTypes: true
+        // rollupTypes: true,
+        outDir: 'dist/types',
+        include: 'src/**/*',
       }),
     ],
   }
