@@ -90,13 +90,24 @@ interface ICreateStoreOptions<T> {
   comparator?: (a: any, b: any) => boolean;
 }
 
+interface ISetStoreOptions {
+  /**
+   * only update the partial value of the store,
+   * * the new value will be merged with the old value
+   */
+  partial?: boolean;
+}
+
+type ISetStoreOptionsType = boolean | ISetStoreOptions
+
 interface IStore<T> {
   // Get the current state of the store, none reactive, could be used anywhere.
   getStore: () => Readonly<T>;
   // Set the state of the store, could be used anywhere, callback could be async.
   // * return a promise if the params is async function
   // * use getStore() to get the latest state of the store when using async function
-  setStore: (state: T | ((prev: T) => T | Promise<T>)) => void | Promise<void>;
+  // * use partial option to update the partial value of the store
+  setStore(newValue: T | ((prev: T) => (T | Promise<T>)), cfg?: ISetStoreOptionsType): void | Promise<void>
   // react hook to get the current state of the store.
   useStore: () => Readonly<T>;
   // react hook to select a part of the state.

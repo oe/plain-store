@@ -8,6 +8,12 @@ export type IInitialState<T> = T | (() => T);
 const needFreeze = (o : any) =>  o && typeof o === 'object' && !Object.isFrozen(o)
 
 /**
+ * BetterPartial type, partial makes all properties optional
+ * * this one make this specified properties as it is
+ */
+export type IBetterPartial<T, K extends keyof T> = Pick<T, K>
+
+/**
  * Deep freeze an object
  * * do not use it to freeze object with circular references
  */
@@ -83,6 +89,16 @@ export interface ICreateStoreOptions<T> {
   comparator?: (a: any, b: any) => boolean;
 }
 
+export interface ISetStoreOptions {
+  /**
+   * only update the partial value of the store,
+   * * the new value will be merged with the old value
+   */
+  partial?: boolean;
+}
+
+export type ISetStoreOptionsType = boolean | ISetStoreOptions
+
 /**
  * create a store for state management
  * @param initialValue initial value of the store
@@ -111,13 +127,26 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
     return data;
   }
 
-  function setStore(cb: (prev: T) => Promise<T>): Promise<void>
-  function setStore(newValue: T | ((prev: T) => T)): void
-  function setStore(newValue: T | ((prev: T) => (T | Promise<T>))) {
+  function setStore(newValue: T | ((prev: T) => (T | Promise<T>)), cfg?: { partial: false }): void | Promise<void>
+
+  function setStore<K extends keyof T>(
+    newValue: IBetterPartial<T, K> | ((prev: T) => (IBetterPartial<T, K> | Promise<IBetterPartial<T, K>>)),
+    cfg: true): void | Promise<void>
+
+  function setStore<K extends keyof T>(
+    newValue: Partial<T> | ((prev: T) => (IBetterPartial<T, K> | Promise<IBetterPartial<T, K>>)),
+    cfg: { partial: true }): void | Promise<void>
+
+  function setStore(newValue: Partial<T> | T | ((prev: T) => (T | Partial<T> | Promise<Partial<T>> | Promise<T>)), cfg?: ISetStoreOptionsType): void | Promise<void> {
     // @ts-expect-error fix types
-    const nextValue = typeof newValue === 'function' ? newValue(currentValue) : newValue
+    let nextValue = typeof newValue === 'function' ? newValue(currentValue) : newValue
+    const partial = typeof cfg === 'object' ? cfg.partial : cfg
 
     const dealWithNewValue = (nextValue: T) => {
+      // merge partial value
+      if (partial && typeof nextValue === 'object') {
+        nextValue = { ...currentValue, ...nextValue }
+      }
       if (comparator(currentValue, nextValue)) return;
       currentValue = deepFreeze<T>(nextValue);
       listeners.forEach(listener => listener(currentValue));

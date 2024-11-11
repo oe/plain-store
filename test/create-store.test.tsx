@@ -28,6 +28,29 @@ describe('createStore', () => {
     expect(store.getStore()).toBe(15);
   });
 
+  it('should update the store value using a function, partial', () => {
+    const store = createStore({ name: 'Saiya', age: 10 });
+    store.setStore((prev) => ({ age: 5 + prev.age }), true);
+    expect(store.getStore().age).toBe(15);
+    store.setStore({ age: 5 }, true);
+    expect(store.getStore().age).toBe(5);
+    expect(store.getStore().name).toBe('Saiya');
+    // @ts-expect-error test partial
+    store.setStore(50, true);
+    expect(store.getStore()).toBe(50);
+  });
+  it('should update the store value using a function, partial2', () => {
+    const store = createStore({ name: 'Saiya', age: 10 });
+    store.setStore((prev) => ({ age: 5 + prev.age }), { partial: true });
+    expect(store.getStore().age).toBe(15);
+    store.setStore({ age: 5 }, { partial: true });
+    expect(store.getStore().age).toBe(5);
+    expect(store.getStore().name).toBe('Saiya');
+    // @ts-expect-error test partial
+    store.setStore(50, false);
+    expect(store.getStore()).toBe(50);
+  });
+
   it('should not update the store value if the new value is equal to the current value', () => {
     const store = createStore(10);
     store.setStore(10);
