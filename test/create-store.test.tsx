@@ -35,6 +35,7 @@ describe('createStore', () => {
     store.setStore({ age: 5 }, true);
     expect(store.getStore().age).toBe(5);
     expect(store.getStore().name).toBe('Saiya');
+    // @ts-expect-error test partial
     store.setStore(50, true);
     expect(store.getStore()).toBe(50);
   });

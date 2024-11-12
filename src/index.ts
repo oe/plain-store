@@ -1,12 +1,22 @@
 import { useState, useEffect } from 'react';
 
 /**
+ * Get a subset of a type
+ * * T is the original type
+ * * V is the subset type
+ * * If T is primitive type, it will return a primitive type
+ * * If T is an object, it will validate whether V is a subset of T
+ */
+export type ISubset<T, V> = T extends V ?  { [K in keyof V]: K extends keyof T ? V[K] : never } : never;
+
+/**
  * Initial state of the store
  */
 export type IInitialState<T> = T | (() => T);
 
-const needFreeze = (o : any) =>  o && typeof o === 'object' && !Object.isFrozen(o)
+const needFreeze = (o: any) => o && typeof o === 'object' && !Object.isFrozen(o);
 
+const hasOwn = Object.prototype.hasOwnProperty;
 /**
  * Deep freeze an object
  * * do not use it to freeze object with circular references
@@ -14,12 +24,14 @@ const needFreeze = (o : any) =>  o && typeof o === 'object' && !Object.isFrozen(
 export function deepFreeze<R extends any>(o: R): Readonly<R> {
   if (!needFreeze(o)) return o;
   Object.getOwnPropertyNames(o).forEach(function (prop) {
-    // @ts-expect-error fix types
-    if (!o.hasOwnProperty(prop) || !needFreeze(o[prop])) return;
+    if (
+      !hasOwn.call(o, prop) ||
+      !needFreeze((o as any)[prop])
+    )
+      return;
     const descriptor = Object.getOwnPropertyDescriptor(o, prop);
     if (descriptor && (descriptor.get || descriptor.set)) return;
-    // @ts-expect-error fix types
-    deepFreeze(o[prop]);
+    deepFreeze((o as any)[prop]);
   });
   return Object.freeze(o);
 }
@@ -33,22 +45,23 @@ const ITERABLE_TYPES = [Object, Array, globalObject.Uint8Array, globalObject.Uin
  */
 export function isDeepEqual(a: any, b: any) {
   if (a === b) return true;
-  // for NaN
-  if (a !== a && b !== b) return true;
+  if (a !== a && b !== b) return true; // NaN check
   if (a == null || b == null) return false;
-  const constructor = a.constructor
-  // not same type, or is a function
+  const constructor = a.constructor;
   if (constructor !== b.constructor || constructor === Function) return false;
   if (constructor === Date) return a.getTime() === b.getTime();
   if (constructor === RegExp) return a.toString() === b.toString();
   if (constructor === Map || constructor === Set) return isDeepEqual(Array.from(a), Array.from(b));
-  // primitive types
-  if (constructor === String || constructor === Number || constructor === Boolean) return a.valueOf() === b.valueOf();
-  // not supported iterable types
+  if (constructor === String || constructor === Number || constructor === Boolean)
+    return a.valueOf() === b.valueOf();
   if (!ITERABLE_TYPES.includes(constructor)) return false;
   if (Object.keys(a).length !== Object.keys(b).length) return false;
   for (const key in a) {
-    if (!isDeepEqual(a[key], b[key])) return false;
+    if (
+      !hasOwn.call(a, key) ||
+      !isDeepEqual(a[key], b[key])
+    )
+      return false;
   }
   return true;
 }
@@ -58,8 +71,7 @@ export function isDeepEqual(a: any, b: any) {
  * Check if a value is a promise
  */
 export function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
-  // @ts-expect-error fix types
-  return value instanceof Promise || (value && typeof value.then === 'function')
+  return value instanceof Promise || (value && typeof (value as any).then === 'function')
 }
 
 /**
@@ -99,7 +111,7 @@ export type ISetStoreOptionsType = boolean | ISetStoreOptions
  */
 export function createStore<T>(initialValue: IInitialState<T>, options?: ICreateStoreOptions<T>) {
   const { onChange = noop, comparator = isDeepEqual } = options || {}
-  // @ts-expect-error fix types
+  // @ts-expect-error ignore type check for initialValue()
   let currentValue = deepFreeze<T>(typeof initialValue === 'function' ? initialValue() : initialValue);
   const listeners = new Set<(value: T) => void>();
 
@@ -120,13 +132,12 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
     }, [])
     return data;
   }
-
-  function setStore(
+    function setStore(
     newValue: T | ((prev: T) => T | Promise<T>),
     cfg?: { partial?: false } | false
   ): void | Promise<void>;
 
-  function setStore<V extends Pick<T, keyof V & keyof T>>(
+  function setStore<V extends ISubset<T, V>>(
     newValue: V | ((prev: T) => V | Promise<V>),
     cfg: { partial: true } | true
   ): void | Promise<void>;
@@ -134,19 +145,19 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
   function setStore(
     newValue: any,
     cfg?: ISetStoreOptionsType
-  ): void | Promise<void> {
+  ): void | Promise<void>  {
     let nextValue = typeof newValue === 'function' ? newValue(currentValue) : newValue;
     const partial = typeof cfg === 'object' ? cfg.partial : cfg;
 
-    const dealWithNewValue = (nextValue: T) => {
-      if (partial && typeof nextValue === 'object') {
-        nextValue = { ...currentValue, ...nextValue };
+    const dealWithNewValue = (nextVal: T) => {
+      if (partial && typeof nextVal === 'object') {
+        nextVal = { ...currentValue, ...nextVal };
       }
-      if (comparator(currentValue, nextValue)) return;
-      currentValue = deepFreeze<T>(nextValue);
-      listeners.forEach(listener => listener(currentValue));
-      onChange(currentValue)
-    }
+      if (comparator(currentValue, nextVal)) return;
+      currentValue = deepFreeze<T>(nextVal);
+      listeners.forEach((listener) => listener(currentValue));
+      onChange(currentValue);
+    };
 
     if (isPromiseLike(nextValue)) {
       return nextValue.then(dealWithNewValue);
@@ -161,15 +172,15 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
      *  * must be used inside a react component
      */
     useStore() {
-      const [_, setRefresh] = useState(false)
+      const [, setRefresh] = useState(false);
       useEffect(() => {
-        const listener = () => setRefresh(refresh => !refresh)
-        listeners.add(listener)
+        const listener = () => setRefresh((refresh) => !refresh);
+        listeners.add(listener);
         return () => {
-          listeners.delete(listener)
-        }
-      }, [])
-      return currentValue
+          listeners.delete(listener);
+        };
+      }, []);
+      return currentValue;
     },
     /**
      * get the latest store value without reactive, can be used outside react component lifecycle
