@@ -35,7 +35,6 @@ describe('createStore', () => {
     store.setStore({ age: 5 }, true);
     expect(store.getStore().age).toBe(5);
     expect(store.getStore().name).toBe('Saiya');
-    // @ts-expect-error test partial
     store.setStore(50, true);
     expect(store.getStore()).toBe(50);
   });
@@ -78,7 +77,7 @@ describe('createStore', () => {
 
   it('should create a selector and update its value when the store value changes', () => {
     const store = createStore(10);
-    const { result } = renderHook(() => store.useSelect((value) => value * 2));
+    const { result } = renderHook(() => store.useSelector((value) => value * 2));
     expect(result.current).toBe(20);
 
     store.setStore(5);

@@ -8,12 +8,6 @@ export type IInitialState<T> = T | (() => T);
 const needFreeze = (o : any) =>  o && typeof o === 'object' && !Object.isFrozen(o)
 
 /**
- * BetterPartial type, partial makes all properties optional
- * * this one make this specified properties as it is
- */
-export type IBetterPartial<T, K extends keyof T> = Pick<T, K>
-
-/**
  * Deep freeze an object
  * * do not use it to freeze object with circular references
  */
@@ -127,36 +121,37 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
     return data;
   }
 
-  function setStore(newValue: T | ((prev: T) => (T | Promise<T>)), cfg?: { partial: false }): void | Promise<void>
+  function setStore(
+    newValue: T | ((prev: T) => T | Promise<T>),
+    cfg?: { partial?: false } | false
+  ): void | Promise<void>;
 
-  function setStore<K extends keyof T>(
-    newValue: IBetterPartial<T, K> | ((prev: T) => (IBetterPartial<T, K> | Promise<IBetterPartial<T, K>>)),
-    cfg: true): void | Promise<void>
+  function setStore<V extends Pick<T, keyof V & keyof T>>(
+    newValue: V | ((prev: T) => V | Promise<V>),
+    cfg: { partial: true } | true
+  ): void | Promise<void>;
 
-  function setStore<K extends keyof T>(
-    newValue: Partial<T> | ((prev: T) => (IBetterPartial<T, K> | Promise<IBetterPartial<T, K>>)),
-    cfg: { partial: true }): void | Promise<void>
-
-  function setStore(newValue: Partial<T> | T | ((prev: T) => (T | Partial<T> | Promise<Partial<T>> | Promise<T>)), cfg?: ISetStoreOptionsType): void | Promise<void> {
-    // @ts-expect-error fix types
-    let nextValue = typeof newValue === 'function' ? newValue(currentValue) : newValue
-    const partial = typeof cfg === 'object' ? cfg.partial : cfg
+  function setStore(
+    newValue: any,
+    cfg?: ISetStoreOptionsType
+  ): void | Promise<void> {
+    let nextValue = typeof newValue === 'function' ? newValue(currentValue) : newValue;
+    const partial = typeof cfg === 'object' ? cfg.partial : cfg;
 
     const dealWithNewValue = (nextValue: T) => {
-      // merge partial value
       if (partial && typeof nextValue === 'object') {
-        nextValue = { ...currentValue, ...nextValue }
+        nextValue = { ...currentValue, ...nextValue };
       }
       if (comparator(currentValue, nextValue)) return;
       currentValue = deepFreeze<T>(nextValue);
       listeners.forEach(listener => listener(currentValue));
       onChange(currentValue)
     }
-    // not using await to avoid async/await in the callback, which will cause async everywhere
+
     if (isPromiseLike(nextValue)) {
-      return nextValue.then(dealWithNewValue)
+      return nextValue.then(dealWithNewValue);
     } else {
-      dealWithNewValue(nextValue)
+      dealWithNewValue(nextValue);
     }
   }
 
