@@ -82,11 +82,16 @@ describe('isDeepEqual', () => {
   it('should correctly handle Map and Set', () => {
     const samples = [
       [new Map([[1, 2], [3, 4]]), new Map([[1, 2], [3, 4]]), true],
+      [new Map([[3, 4], [1, 2]]), new Map([[1, 2], [3, 4]]), true],
+      [new Map([[{a: 2}, 2], [{a: 3}, 4]]), new Map([[{a: 3}, 4], [{a: 2}, 2]]), false],
+      [new Map([[{a: 2}, 2], [{a: 3}, 4]]), new Map([[1, 2], [3, 4]]), false],
+      [new Map([[1, 2], [3, 4]]), new Map([[1, 2]]), false],
       [new Map([[1, 2], [3, 4]]), new Map([[1, 2], [3, 5]]), false],
       [new Map([[1, 2], [3, 4]]), new Map([[1, 2]]), false],
       [new Map([[1, 2], [3, 4]]), new Map([[1, 2], [3, 4], [5, 6]]), false],
-      [new Set([1, 2, 3]), new Set([1, 2, 3]), true],
+      [new Set([1, 2, 3]), new Set([2, 1, 3]), true],
       [new Set([1, 2, 3]), new Set([1, 2, 4]), false],
+      [new Set([1, 2, 3]), new Set([1, 4]), false],
       [new Set([1, 2, 3]), new Set([1, 2]), false],
       [new Set([1, 2, 3]), new Set([1, 2, 3, 4]), false],
     ]
@@ -147,6 +152,7 @@ describe('isDeepEqual', () => {
       expect(isDeepEqual(a, b)).toBe(result);
     });
   });
+
   it('should handle edge cases', () => {
     const img = new Image()
     const samples = [
@@ -177,6 +183,76 @@ describe('isDeepEqual', () => {
       [{a: [12,323], b: false}, {c: 1, d: 'hello'}, false],
     ]
 
+    samples.forEach(([a, b, result]) => {
+      expect(isDeepEqual(a, b)).toBe(result);
+    });
+  });
+
+  it('should correctly handle Symbols', () => {
+    const samples = [
+      [Symbol('foo'), Symbol('foo'), false],
+      [Symbol.for('bar'), Symbol.for('bar'), true],
+      [Symbol('foo'), Symbol('bar'), false],
+      [Symbol.iterator, Symbol.iterator, true],
+    ];
+    samples.forEach(([a, b, result]) => {
+      expect(isDeepEqual(a, b)).toBe(result);
+    });
+  });
+
+  it('should correctly handle BigInt', () => {
+    const samples = [
+      [BigInt(1234567890123456789), BigInt(1234567890123456789), true],
+      [BigInt(1234567890123456789), BigInt(9876543210987654321), false],
+    ];
+    samples.forEach(([a, b, result]) => {
+      expect(isDeepEqual(a, b)).toBe(result);
+    });
+  });
+
+  it('should correctly handle TypedArrays', () => {
+    const buffer = new ArrayBuffer(8);
+    const samples = [
+      [new Int8Array([1, 2, 3]), new Int8Array([1, 2, 3]), true],
+      [new Int8Array([1, 2, 3]), new Int8Array([1, 2, 4]), false],
+      [new Int8Array([1, 2, 3]), new Int8Array([1, 2]), false],
+      [new Uint8Array([1, 2, 3]), new Uint8Array([1, 2, 3]), true],
+      [new Uint8Array([1, 2, 3]), new Uint8Array([1, 2, 4]), false],
+      [new Float32Array([1.1, 2.2, 3.3]), new Float32Array([1.1, 2.2, 3.3]), true],
+      [new Float32Array([1.1, 2.2, 3.3]), new Float32Array([1.1, 2.2, 3.4]), false],
+      [new DataView(buffer), new DataView(buffer), true],
+      [new DataView(buffer), new DataView(new ArrayBuffer(8)), true],
+    ];
+    samples.forEach(([a, b, result]) => {
+      expect(isDeepEqual(a, b)).toBe(result);
+    });
+  });
+
+  it('should correctly handle mixed types', () => {
+    const samples = [
+      [{ a: [1, { b: 2 }], c: 'foo' }, { a: [1, { b: 2 }], c: 'foo' }, true],
+      [{ a: [1, { b: 2 }], c: 'foo' }, { a: [1, { b: 3 }], c: 'foo' }, false],
+      [{ a: new Set([1, 2]), b: new Map([['key', 'value']]) }, { a: new Set([1, 2]), b: new Map([['key', 'value']]) }, true],
+      [{ a: new Set([1, 2]), b: new Map([['key', 'value']]) }, { a: new Set([1, 3]), b: new Map([['key', 'value']]) }, false],
+    ];
+    samples.forEach(([a, b, result]) => {
+      expect(isDeepEqual(a, b)).toBe(result);
+    });
+  });
+
+  it('should correctly handle empty and null values', () => {
+    const samples = [
+      [null, null, true],
+      [undefined, undefined, true],
+      [null, undefined, false],
+      [0, null, false],
+      ['', null, false],
+      [[], null, false],
+      [{}, null, false],
+      [NaN, NaN, true],
+      [NaN, 0, false],
+      [NaN, 'NaN', false],
+    ];
     samples.forEach(([a, b, result]) => {
       expect(isDeepEqual(a, b)).toBe(result);
     });

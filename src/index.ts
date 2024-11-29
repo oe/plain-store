@@ -43,9 +43,28 @@ export function isDeepEqual(a: any, b: any) {
     }
     return true;
   }
+  if (constructor === Map) {
+    if (a.size !== b.size) return false;
+    for (const [key, value] of a) {
+      if (!b.has(key) || !isDeepEqual(value, b.get(key))) return false;
+    }
+    return true;
+  }
+  if (ArrayBuffer.isView(a) && ArrayBuffer.isView(b)) {
+    // @ts-expect-error a and b are TypedArray
+    let length = a.length;
+    // @ts-expect-error a and b are TypedArray
+    if (length !== b.length) return false;
+    // Compare the contents byte by byte
+    for (let i = 0; i < length; i++) {
+      // @ts-expect-error a and b are TypedArray
+      if (a[i] !== b[i]) return false;
+    }
+    // If no differences found
+    return true;
+  }
   if (a.valueOf !== Object.prototype.valueOf) return a.valueOf() === b.valueOf();
   if (a.toString !== Object.prototype.toString) return a.toString() === b.toString();
-  if (constructor === Map) return isDeepEqual(Array.from(a), Array.from(b));
   if (!ITERABLE_TYPES.includes(constructor)) return false;
   if (Object.keys(a).length !== Object.keys(b).length) return false;
   for (const key in a) {
