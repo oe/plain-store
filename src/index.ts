@@ -14,27 +14,7 @@ export type ISubset<T, V> = T extends V ?  { [K in keyof V]: K extends keyof T ?
  */
 export type IInitialState<T> = T | (() => T);
 
-const needFreeze = (o: any) => o && typeof o === 'object' && !Object.isFrozen(o);
-
 const hasOwn = Object.prototype.hasOwnProperty;
-/**
- * Deep freeze an object
- * * do not use it to freeze object with circular references
- */
-export function deepFreeze<R extends any>(o: R): Readonly<R> {
-  if (!needFreeze(o)) return o;
-  Object.getOwnPropertyNames(o).forEach(function (prop) {
-    if (
-      !hasOwn.call(o, prop) ||
-      !needFreeze((o as any)[prop])
-    )
-      return;
-    const descriptor = Object.getOwnPropertyDescriptor(o, prop);
-    if (descriptor && (descriptor.get || descriptor.set)) return;
-    deepFreeze((o as any)[prop]);
-  });
-  return Object.freeze(o);
-}
 
 const globalObject: any = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof self !== 'undefined' ? self : {}
 /** env builtin Objects */
@@ -49,11 +29,23 @@ export function isDeepEqual(a: any, b: any) {
   if (a == null || b == null) return false;
   const constructor = a.constructor;
   if (constructor !== b.constructor || constructor === Function) return false;
-  if (constructor === Date) return a.getTime() === b.getTime();
-  if (constructor === RegExp) return a.toString() === b.toString();
-  if (constructor === Map || constructor === Set) return isDeepEqual(Array.from(a), Array.from(b));
-  if (constructor === String || constructor === Number || constructor === Boolean)
-    return a.valueOf() === b.valueOf();
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!isDeepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+  if (constructor === Set) {
+    if (a.size !== b.size) return false;
+    for (const value of a) {
+      if (!b.has(value)) return false;
+    }
+    return true;
+  }
+  if (a.valueOf !== Object.prototype.valueOf) return a.valueOf() === b.valueOf();
+  if (a.toString !== Object.prototype.toString) return a.toString() === b.toString();
+  if (constructor === Map) return isDeepEqual(Array.from(a), Array.from(b));
   if (!ITERABLE_TYPES.includes(constructor)) return false;
   if (Object.keys(a).length !== Object.keys(b).length) return false;
   for (const key in a) {
@@ -110,19 +102,19 @@ export type ISetStoreOptionsType = boolean | ISetStoreOptions
  * @param initialValue initial value of the store
  */
 export function createStore<T>(initialValue: IInitialState<T>, options?: ICreateStoreOptions<T>) {
-  const { onChange = noop, comparator = isDeepEqual } = options || {}
-  // @ts-expect-error ignore type check for initialValue()
-  let currentValue = deepFreeze<T>(typeof initialValue === 'function' ? initialValue() : initialValue);
+  const { onChange = noop, comparator = isDeepEqual } = options || {};
+  // @ts-expect-error initialValue can be a function
+  let currentValue: Readonly<T> = typeof initialValue === 'function' ? initialValue() : initialValue;
   const listeners = new Set<(value: T) => void>();
 
-  const useSelector = <R>(converter: (value: T) => R) => {
-    const [data, setData] = useState(converter(currentValue))
+  const useSelector = <R>(converter: (value: T) => R): Readonly<R> => {
+    const [data, setData] = useState(converter(currentValue));
     useEffect(() => {
       const listener = (value: T) => {
         setData((prev) => {
-          const nextData = converter(value)
+          const nextData = converter(value);
           if (comparator(prev, nextData)) return prev;
-          return deepFreeze(nextData)
+          return nextData
         })
       }
       listeners.add(listener)
@@ -154,7 +146,7 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
         nextVal = { ...currentValue, ...nextVal };
       }
       if (comparator(currentValue, nextVal)) return;
-      currentValue = deepFreeze<T>(nextVal);
+      currentValue = nextVal;
       listeners.forEach((listener) => listener(currentValue));
       onChange(currentValue);
     };
