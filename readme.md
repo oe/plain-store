@@ -41,6 +41,7 @@ store.setStore({ count: 1 });
 
 function Counter() {
   const { count } = store.useStore();
+  // derive a new value from the store value
   const doubled = store.useSelector((state) => state.count * 2);
   return (
     <div>
@@ -81,7 +82,7 @@ interface ICreateStoreOptions<T> {
   /**
    * listen to the store value changes
    */
-  onChange?: (value: T) => void;
+  onChange?: (value: Readonly<T>) => void;
   /**
    * custom comparator for store value changes, default to `isDeepEqual`
    * * use it when the default comparator is not working as expected
@@ -111,7 +112,7 @@ interface IStore<T> {
   // react hook to get the current state of the store.
   useStore: () => Readonly<T>;
   // react hook to select a part of the state.
-  useSelector: <R>(selector: (state: T) => R) => R;
+  useSelector: <R>(selector: (state: T) => R) => Readonly<R>;
 }
 function createStore<T>(initialState: T | (() => T), options?: ICreateStoreOptions<T>): IStore<T>;
 ```
@@ -129,13 +130,6 @@ Check if two values are deeply equal, can efficiently compare common data struct
 ```ts
 import { isDeepEqual } from 'plain-store';
 function isDeepEqual(a: any, b: any): boolean;
-```
-
-### deepFreeze(obj)
-Freeze an object deeply
-```ts
-import { deepFreeze } from 'plain-store';
-function deepFreeze(obj: any): any;
 ```
 
 ### isPromiseLike(obj)

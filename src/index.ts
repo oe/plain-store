@@ -92,13 +92,13 @@ export interface ICreateStoreOptions<T> {
   /**
    * listen to the store value changes
    */
-  onChange?: (value: T) => void;
+  onChange?: (value: Readonly<T>) => void;
   /**
    * custom comparator for store value changes, default to `isDeepEqual`
    *  * use it when the default comparator is not working as expected
    *  * `isDeepEqual` works for most cases, but it's not perfect, you can provide a custom comparator to handle the edge cases or performance issues.
    */
-  comparator?: (a: any, b: any) => boolean;
+  comparator?: (a: unknown, b: unknown) => boolean;
 }
 
 export interface ISetStoreOptions {
