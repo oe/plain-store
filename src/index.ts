@@ -16,10 +16,6 @@ export type IInitialState<T> = T | (() => T);
 
 const hasOwn = Object.prototype.hasOwnProperty;
 
-const globalObject: any = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof self !== 'undefined' ? self : {}
-/** env builtin Objects */
-const ITERABLE_TYPES = [Object, Array, globalObject.Uint8Array, globalObject.Uint8ClampedArray, globalObject.Uint16Array, globalObject.Uint32Array, globalObject.Int8Array, globalObject.Int16Array, globalObject.Int32Array, globalObject.Float32Array, globalObject.Float64Array, globalObject.BigInt64Array, globalObject.BigUint64Array].filter(Boolean)
-
 /**
  * Deep compare two values
  */
@@ -65,11 +61,10 @@ export function isDeepEqual(a: any, b: any) {
   }
   if (a.valueOf !== Object.prototype.valueOf) return a.valueOf() === b.valueOf();
   if (a.toString !== Object.prototype.toString) return a.toString() === b.toString();
-  if (!ITERABLE_TYPES.includes(constructor)) return false;
   if (Object.keys(a).length !== Object.keys(b).length) return false;
   for (const key in a) {
     if (
-      !hasOwn.call(a, key) ||
+      !hasOwn.call(b, key) ||
       !isDeepEqual(a[key], b[key])
     )
       return false;
