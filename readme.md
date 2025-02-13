@@ -30,7 +30,7 @@ yarn add plain-store
 ## Usage
 using with bundler or es module
 ```javascript
-import { createStore, isDeepEqual, deepFreeze } from 'plain-store';
+import { createStore, isDeepEqual } from 'plain-store';
 
 const initialState = {
   count: 0
@@ -62,7 +62,7 @@ using with script tag
 <script src="https://cdn.jsdelivr.net/npm/react/umd/react.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/plain-store/dist/index.iife.js"></script>
 <script>
-  const { createStore, isDeepEqual, deepFreeze } = PlainStore;
+  const { createStore, isDeepEqual } = PlainStore;
   const store = createStore({ count: 0 }, {
     onChange: (value) => {
       console.log('store value changed', value);
@@ -116,9 +116,6 @@ interface IStore<T> {
 }
 function createStore<T>(initialState: T | (() => T), options?: ICreateStoreOptions<T>): IStore<T>;
 ```
-
-> [!WARNING]
-> The store value is immutable(freezed by Object.freeze), do not mutate the store value directly or an error will be thrown.
 
 ```ts
 // always use a new object to update the store value
