@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore, useRef, useCallback } from 'react';
 
 /**
  * Get a subset of a type
@@ -12,7 +12,7 @@ export type ISubset<T, V> = T extends V ?  { [K in keyof V]: K extends keyof T ?
 /**
  * Initial state of the store
  */
-export type IInitialState<T> = T | (() => T);
+export type IInitialState<T> = T extends (...args: any[]) => any ? never : T | (() => T);
 
 const hasOwn = Object.prototype.hasOwnProperty;
 
@@ -117,28 +117,37 @@ export type ISetStoreOptionsType = boolean | ISetStoreOptions
  */
 export function createStore<T>(initialValue: IInitialState<T>, options?: ICreateStoreOptions<T>) {
   const { onChange = noop, comparator = isDeepEqual } = options || {};
-  // @ts-expect-error initialValue can be a function
   let currentValue: Readonly<T> = typeof initialValue === 'function' ? initialValue() : initialValue;
-  const listeners = new Set<(value: T) => void>();
+  const listeners = new Set<() => void>();
+
+  const subscribe = (callback: () => void) => {
+    listeners.add(callback);
+    return () => listeners.delete(callback);
+  };
+
+  const getSnapshot = () => currentValue;
+
+  const useStore = () => useSyncExternalStore(subscribe, getSnapshot);
 
   const useSelector = <R>(converter: (value: T) => R): Readonly<R> => {
-    const [data, setData] = useState(converter(currentValue));
-    useEffect(() => {
-      const listener = (value: T) => {
-        setData((prev) => {
-          const nextData = converter(value);
-          if (comparator(prev, nextData)) return prev;
-          return nextData
-        })
-      }
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    }, [])
-    return data;
-  }
-    function setStore(
+    const lastInfo = useRef({ value: converter(currentValue), converter });
+    lastInfo.current.converter = converter;
+
+    const subscribeChange = useCallback((callback: () => void) => {
+      // wrap the callback to compare the new value with the old value
+      const wrappedCallback = () => {
+        const newValue = lastInfo.current.converter(currentValue);
+        if (comparator(lastInfo.current.value, newValue)) return;
+        lastInfo.current.value = newValue;
+        callback();
+      };
+      return subscribe(wrappedCallback);
+    }, []);
+
+    return useSyncExternalStore(subscribeChange, () => lastInfo.current.value);
+  };
+
+  function setStore(
     newValue: T | ((prev: T) => T | Promise<T>),
     cfg?: { partial?: false } | false
   ): void | Promise<void>;
@@ -161,7 +170,7 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
       }
       if (comparator(currentValue, nextVal)) return;
       currentValue = nextVal;
-      listeners.forEach((listener) => listener(currentValue));
+      listeners.forEach((listener) => listener());
       onChange(currentValue);
     };
 
@@ -177,27 +186,15 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
      * use the store, get the whole store value and re-render when the store value changes
      *  * must be used inside a react component
      */
-    useStore() {
-      const [, setRefresh] = useState(false);
-      useEffect(() => {
-        const listener = () => setRefresh((refresh) => !refresh);
-        listeners.add(listener);
-        return () => {
-          listeners.delete(listener);
-        };
-      }, []);
-      return currentValue;
-    },
+    useStore,
     /**
      * get the latest store value without reactive, can be used outside react component lifecycle
      */
-    getStore() {
-      return currentValue;
-    },
+    getStore: getSnapshot,
     /**
      * update the store value, can be called outside react component lifecycle
      * @param newValue the new value to set, or a function that takes the previous value and returns the new value
-     * * use getStore() to get the latest state of the store when using async function
+     * @param cfg optional options for setting the store value
      * @returns a promise if the new value is a async function, otherwise void
      */
     setStore,
@@ -211,6 +208,6 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
      * @deprecated use `useSelector` instead
      * @param converter convert the store value to a new value
      */
-    useSelect: useSelector,
-  }
+    useSelect: useSelector
+  };
 }
