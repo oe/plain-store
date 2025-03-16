@@ -8,53 +8,53 @@ const waitFor = (time = 0) => new Promise((resolve) => setTimeout(resolve, time)
 describe('createStore', () => {
   it('should initialize the store with the initial value', () => {
     const store = createStore(10);
-    expect(store.getStore()).toBe(10);
+    expect(store.get()).toBe(10);
   });
 
   it('should initialize the store with the initial value returned by a function', () => {
     const store = createStore(() => 20);
-    expect(store.getStore()).toBe(20);
+    expect(store.get()).toBe(20);
   });
 
   it('should update the store value', () => {
     const store = createStore(10);
-    store.setStore(20);
-    expect(store.getStore()).toBe(20);
+    store.set(20);
+    expect(store.get()).toBe(20);
   });
 
   it('should update the store value using a function', () => {
     const store = createStore(10);
-    store.setStore((prev) => prev + 5);
-    expect(store.getStore()).toBe(15);
+    store.set((prev) => prev + 5);
+    expect(store.get()).toBe(15);
   });
 
   it('should update the store value using a function, partial', () => {
     const store = createStore({ name: 'Saiya', age: 10 });
-    store.setStore((prev) => ({ age: 5 + prev.age }), true);
-    expect(store.getStore().age).toBe(15);
-    store.setStore({ age: 5 }, true);
-    expect(store.getStore().age).toBe(5);
-    expect(store.getStore().name).toBe('Saiya');
+    store.set((prev) => ({ age: 5 + prev.age }), true);
+    expect(store.get().age).toBe(15);
+    store.set({ age: 5 }, true);
+    expect(store.get().age).toBe(5);
+    expect(store.get().name).toBe('Saiya');
     // @ts-expect-error test partial
-    store.setStore(50, true);
-    expect(store.getStore()).toBe(50);
+    store.set(50, true);
+    expect(store.get()).toBe(50);
   });
   it('should update the store value using a function, partial2', () => {
     const store = createStore({ name: 'Saiya', age: 10 });
-    store.setStore((prev) => ({ age: 5 + prev.age }), { partial: true });
-    expect(store.getStore().age).toBe(15);
-    store.setStore({ age: 5 }, { partial: true });
-    expect(store.getStore().age).toBe(5);
-    expect(store.getStore().name).toBe('Saiya');
+    store.set((prev) => ({ age: 5 + prev.age }), { partial: true });
+    expect(store.get().age).toBe(15);
+    store.set({ age: 5 }, { partial: true });
+    expect(store.get().age).toBe(5);
+    expect(store.get().name).toBe('Saiya');
     // @ts-expect-error test partial
-    store.setStore(50, false);
-    expect(store.getStore()).toBe(50);
+    store.set(50, false);
+    expect(store.get()).toBe(50);
   });
 
   it('should not update the store value if the new value is equal to the current value', () => {
     const store = createStore(10);
-    store.setStore(10);
-    expect(store.getStore()).toBe(10);
+    store.set(10);
+    expect(store.get()).toBe(10);
   });
 
 
@@ -63,7 +63,7 @@ describe('createStore', () => {
     const { result } = renderHook(() => store.useStore());
     expect(result.current).toBe(10);
 
-    store.setStore(5);
+    store.set(5);
     expect(result.current).toBe(5);
   });
 
@@ -72,7 +72,7 @@ describe('createStore', () => {
     const { result, unmount} = renderHook(() => store.useStore());
     expect(result.current.name).toBe('Saiya');
     unmount();
-    store.setStore((prev) => ({...prev, name: 'Goku'}));
+    store.set((prev) => ({...prev, name: 'Goku'}));
     expect(result.current.name).toBe('Saiya');
   });
 
@@ -81,7 +81,7 @@ describe('createStore', () => {
     const { result } = renderHook(() => store.useSelector((value) => value * 2));
     expect(result.current).toBe(20);
 
-    store.setStore(5);
+    store.set(5);
     expect(result.current).toBe(10);
   });
 
@@ -90,12 +90,12 @@ describe('createStore', () => {
     const { result, unmount } = renderHook(() => store.useSelect((value) => value * 2));
     expect(result.current).toBe(20);
 
-    store.setStore(10);
+    store.set(10);
     expect(result.current).toBe(20);
-    store.setStore(6);
+    store.set(6);
     expect(result.current).toBe(12);
     unmount();
-    store.setStore(12);
+    store.set(12);
     expect(result.current).toBe(12);
   });
 
@@ -104,7 +104,7 @@ describe('createStore', () => {
     const { result } = renderHook(() => store.useSelect((value) => value.length));
     expect(result.current).toBe(3);
 
-    store.setStore('abc');
+    store.set('abc');
     expect(result.current).toBe(3);
   });
 
@@ -117,10 +117,10 @@ describe('createStore', () => {
     });
     expect(renderCount).toBe(1);
     expect(result.current).toBe(3);
-    store.setStore('abc');
+    store.set('abc');
     expect(renderCount).toBe(1);
     expect(result.current).toBe(3);
-    store.setStore('abcd');
+    store.set('abcd');
     expect(renderCount).toBe(2);
     expect(result.current).toBe(4);
   });
@@ -137,32 +137,33 @@ describe('createStore', () => {
     expect(result.innerHTML).toBe('3');
   });
 
-  it('check onChange', async () => {
+  it('check subscribe', async () => {
     let changed = 0
-    const store = createStore('xxx', {
-      onChange() {
-        changed++
-      }
-    });
+    const store = createStore('xxx');
+    const unsubscribe = store.subscribe(() => {
+      changed++
+    })
     expect(changed).toBe(0);
-    store.setStore('abc');
+    store.set('abc');
+    expect(changed).toBe(1);
+    unsubscribe();
+    store.set('abcd');
     expect(changed).toBe(1);
   });
 
-  it('async onChange', async () => {
+  it('async subscribe', async () => {
     let changed = 0
-    const store = createStore('xxx', {
-      onChange() {
-        changed++
-      }
-    });
-    expect(changed).toBe(0);
+    const store = createStore('xxx');
 
+    store.subscribe(() => {
+      changed++
+    })
+    expect(changed).toBe(0);
     const updateAsync = async () => {
       await waitFor(1000)
       return 'efg'
     }
-    store.setStore(updateAsync);
+    store.set(updateAsync);
     expect(changed).toBe(0);
     await waitFor(1000)
     expect(changed).toBe(1);
@@ -170,38 +171,37 @@ describe('createStore', () => {
 
   it('without custom comparator', async () => {
     let changed = 0
-    const store = createStore(1, {
-      onChange() {
-        ++changed
-      },
-    });
-
-    store.setStore(2);
+    const store = createStore(1);
+    const unsubscribe = store.subscribe(() => {
+      changed++
+    })
+    store.set(2);
     expect(changed).toBe(1);
-    store.setStore(NaN);
+    store.set(NaN);
     expect(changed).toBe(2);
-    store.setStore(NaN);
+    store.set(NaN);
     expect(changed).toBe(2);
-    store.setStore(NaN);
+    unsubscribe();
+    store.set(233);
     expect(changed).toBe(2);
   })
   it('custom comparator', async () => {
     const comparator = (a: any, b: any) => a === b
     let changed = 0
-    const store = createStore(1, {
-      onChange() {
-        ++changed
-      },
+    const store = createStore(1,{
       comparator
     });
-
-    store.setStore(2);
+    const unsubscribe = store.subscribe(() => {
+      changed++
+    })
+    store.set(2);
     expect(changed).toBe(1);
-    store.setStore(NaN);
+    store.set(NaN);
     expect(changed).toBe(2);
-    store.setStore(NaN);
+    store.set(NaN);
     expect(changed).toBe(3);
-    store.setStore(NaN);
-    expect(changed).toBe(4);
+    unsubscribe();
+    store.set(NaN);
+    expect(changed).toBe(3);
   })
 });

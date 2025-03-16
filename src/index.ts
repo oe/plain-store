@@ -81,18 +81,9 @@ export function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
 }
 
 /**
- * noop function, for default callback
- */
-const noop = () => {}
-
-/**
  * options for creating a store
  */
-export interface ICreateStoreOptions<T> {
-  /**
-   * listen to the store value changes
-   */
-  onChange?: (value: Readonly<T>) => void;
+export interface ICreateStoreOptions {
   /**
    * custom comparator for store value changes, default to `isDeepEqual`
    *  * use it when the default comparator is not working as expected
@@ -115,8 +106,8 @@ export type ISetStoreOptionsType = boolean | ISetStoreOptions
  * create a store for state management
  * @param initialValue initial value of the store
  */
-export function createStore<T>(initialValue: IInitialState<T>, options?: ICreateStoreOptions<T>) {
-  const { onChange = noop, comparator = isDeepEqual } = options || {};
+export function createStore<T>(initialValue: IInitialState<T>, options?: ICreateStoreOptions) {
+  const { comparator = isDeepEqual } = options || {};
   let currentValue: Readonly<T> = typeof initialValue === 'function' ? initialValue() : initialValue;
   const listeners = new Set<() => void>();
 
@@ -171,7 +162,6 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
       if (comparator(currentValue, nextVal)) return;
       currentValue = nextVal;
       listeners.forEach((listener) => listener());
-      onChange(currentValue);
     };
 
     if (isPromiseLike(nextValue)) {
@@ -183,6 +173,12 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
 
   return {
     /**
+     * subscribe to the store value changes
+     * @param callback the callback to be called when the store value changes, accept no arguments, use `get` to get the latest store value
+     * @returns a function to unsubscribe the callback
+     */
+    subscribe,
+    /**
      * use the store, get the whole store value and re-render when the store value changes
      *  * must be used inside a react component
      */
@@ -190,12 +186,22 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
     /**
      * get the latest store value without reactive, can be used outside react component lifecycle
      */
+    get: getSnapshot,
+    /**
+     * get the latest store value without reactive, can be used outside react component lifecycle
+     * @deprecated use `get` instead
+     */
     getStore: getSnapshot,
     /**
      * update the store value, can be called outside react component lifecycle
      * @param newValue the new value to set, or a function that takes the previous value and returns the new value
      * @param cfg optional options for setting the store value
      * @returns a promise if the new value is a async function, otherwise void
+     */
+    set: setStore,
+    /**
+     * update the store value, can be called outside react component lifecycle
+     * @deprecated use `set` instead
      */
     setStore,
     /**

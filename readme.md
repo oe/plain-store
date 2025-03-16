@@ -16,7 +16,7 @@
     <img src="https://img.shields.io/npm/dm/plain-store.svg" alt="npm version" height="20">
   </a>
 </div>
-A dead simple immutable store for react to manage state in your application, redux alternative in less than 1kb gzipped.
+A dead simple immutable store for react to manage state in your application, redux alternative in less than 1kb gzipped. Signal like store, no reducer, no context, no provider, no HOC, no epic.
 
 ## Installation
 ```bash
@@ -37,7 +37,7 @@ const initialState = {
 };
 
 const store = createStore(initialState);
-store.setStore({ count: 1 });
+store.set({ count: 1 });
 
 function Counter() {
   const { count } = store.useStore();
@@ -47,13 +47,13 @@ function Counter() {
     <div>
       <div>count: {count}</div>
       <div>doubled: {doubled}</div>
-      <button onClick={() => store.setStore((prev) => ({ count: 1 + prev.count }))}>Increment</button>
+      <button onClick={() => store.set((prev) => ({ count: 1 + prev.count }))}>Increment</button>
     </div>
   );
 }
 
-store.getStore(); // { count: 1 }
-store.setStore((prev) => ({ count: 2 + prev.count })); // { count: 3 }, will trigger Counter re-render
+store.get(); // { count: 1 }
+store.set((prev) => ({ count: 2 + prev.count })); // { count: 3 }, will trigger Counter re-render
 ```
 
 using with script tag
@@ -63,12 +63,8 @@ using with script tag
 <script src="https://cdn.jsdelivr.net/npm/plain-store/dist/index.iife.js"></script>
 <script>
   const { createStore, isDeepEqual } = PlainStore;
-  const store = createStore({ count: 0 }, {
-    onChange: (value) => {
-      console.log('store value changed', value);
-    }
-  });
-  store.setStore({ count: 1 });
+  const store = createStore({ count: 0 });
+  store.set({ count: 1 });
 </script>
 ```
 
@@ -79,10 +75,6 @@ Create a store with the initial state.
 import { createStore } from 'plain-store';
 
 interface ICreateStoreOptions<T> {
-  /**
-   * listen to the store value changes
-   */
-  onChange?: (value: Readonly<T>) => void;
   /**
    * custom comparator for store value changes, default to `isDeepEqual`
    * * use it when the default comparator is not working as expected
@@ -102,13 +94,15 @@ interface ISetStoreOptions {
 type ISetStoreOptionsType = boolean | ISetStoreOptions
 
 interface IStore<T> {
+  // listen to the store value changes, return a function to unsubscribe.
+  subscribe: (listener: () => void) => () => void;
   // Get the current state of the store, none reactive, could be used anywhere.
-  getStore: () => Readonly<T>;
+  get: () => Readonly<T>;
   // Set the state of the store, could be used anywhere, callback could be async.
   // * return a promise if the params is async function
   // * use getStore() to get the latest state of the store when using async function
   // * use partial option to update the partial value of the store
-  setStore(newValue: T | ((prev: T) => (T | Promise<T>)), cfg?: ISetStoreOptionsType): void | Promise<void>
+  set: (newValue: T | ((prev: T) => (T | Promise<T>)), cfg?: ISetStoreOptionsType): void | Promise<void>
   // react hook to get the current state of the store.
   useStore: () => Readonly<T>;
   // react hook to select a part of the state.
@@ -119,7 +113,7 @@ function createStore<T>(initialState: T | (() => T), options?: ICreateStoreOptio
 
 ```ts
 // always use a new object to update the store value
-store.setStore((prev) => ({ ...prev, newItem: 'xxx' }))
+store.set((prev) => ({ ...prev, newItem: 'xxx' }))
 ```
 
 ### isDeepEqual(a, b)

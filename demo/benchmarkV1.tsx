@@ -16,8 +16,14 @@ const CountDisplay = () => {
 
 const DoubleDisplay = () => {
   const count = useSelector((state) => state.count * 2);
+  console.log('Benchmark DoubleDisplay useEffect rendered')
   return <div>Double Count: {count}</div>;
 };
+
+const ProgressiveDisplay = () => {
+  const count = useSelector((state) => (state.count % 4) > 0);
+  return <div>Progressive Count: {String(count)}</div>;
+}
 
 export const BenchmarkV1 = () => {
 
@@ -29,12 +35,15 @@ export const BenchmarkV1 = () => {
     console.timeEnd('Benchmark useEffect');
   }, []);
 
+  console.log('Benchmark useEffect rendered')
+
   return (
     <div>
       <h1>Benchmark useEffect</h1>
       <IncrementButton />
       <CountDisplay />
       <DoubleDisplay />
+      <ProgressiveDisplay />
     </div>
   );
 };
