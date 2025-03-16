@@ -4,6 +4,7 @@ import { C1 } from './c1'
 import { Name } from './name'
 import { BenchmarkV1 } from './benchmarkV1'
 import { BenchmarkV2 } from './benchmarkV2'
+import { BenchmarkV3 } from './benchmarkReactSignal'
 
 export const App = () => {
   const nameLength = nameStore.useSelector(n => n.length)
@@ -15,6 +16,7 @@ export const App = () => {
       <Name />
       <BenchmarkV1 />
       <BenchmarkV2 />
+      <BenchmarkV3 />
     </div>
   )
 }

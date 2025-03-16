@@ -30,6 +30,7 @@
     "redux"
   ],
   "devDependencies": {
+    "@preact/signals-react": "^3.0.1",
     "@testing-library/dom": "^10.2.0",
     "@testing-library/react": "^16.0.0",
     "@testing-library/react-hooks": "^8.0.1",
