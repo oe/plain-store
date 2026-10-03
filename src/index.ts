@@ -144,14 +144,22 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
         const next = converter(snapshot);
         const previous = cached || committed.current;
         const value = previous && comparator(previous.value, next) ? previous.value : next;
-        cached = { snapshot, value };
+        if (cached) {
+          cached.snapshot = snapshot;
+          cached.value = value;
+        } else {
+          cached = { snapshot, value };
+        }
         return value;
       };
       return [() => select(getSnapshot()), () => select(getServerSnapshot())];
     }, [converter]);
 
     const value = useSyncExternalStore(subscribe, getSelection, getServerSelection);
-    useEffect(() => { committed.current = { value }; }, [value]);
+    useEffect(() => {
+      if (committed.current) committed.current.value = value;
+      else committed.current = { value };
+    }, [value]);
     return value;
   };
 

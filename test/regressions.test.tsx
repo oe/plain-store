@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
-import { StrictMode, Suspense, startTransition, useLayoutEffect, useState } from 'react';
+import { StrictMode, Suspense, startTransition, useCallback, useLayoutEffect, useState } from 'react';
 import { renderToString } from 'react-dom/server';
 import { createRoot, hydrateRoot } from 'react-dom/client';
 import { createStore, isDeepEqual, isPromiseLike } from '../src';
@@ -45,6 +45,41 @@ describe('store regressions', () => {
     expect(result.current).toBe(selected);
     act(() => store.set({ count: 1 }, true));
     expect(result.current).toEqual({ count: 1 });
+  });
+
+  it('evaluates a stable selector once per accepted snapshot', () => {
+    const store = createStore({ count: 0, other: 0 });
+    let calls = 0;
+    const selector = (state: { count: number }) => {
+      calls++;
+      return { count: state.count };
+    };
+    const { result } = renderHook(() => store.useSelector(selector));
+    expect(calls).toBe(1);
+    act(() => { store.set({ other: 1 }, true); });
+    expect(calls).toBe(2);
+    act(() => { store.set({ count: 1 }, true); });
+    expect(calls).toBe(3);
+    expect(result.current).toEqual({ count: 1 });
+  });
+
+  it('unsubscribes selectors on unmount and handles memoized prop selectors', () => {
+    const store = createStore({ count: 1 });
+    let calls = 0;
+    const { result, rerender, unmount } = renderHook(({ multiplier }) => {
+      const selector = useCallback((state: { count: number }) => {
+        calls++;
+        return state.count * multiplier;
+      }, [multiplier]);
+      return store.useSelector(selector);
+    }, { initialProps: { multiplier: 2 } });
+    expect(result.current).toBe(2);
+    rerender({ multiplier: 3 });
+    expect(result.current).toBe(3);
+    unmount();
+    const previousCalls = calls;
+    store.set({ count: 2 });
+    expect(calls).toBe(previousCalls);
   });
 
   it('renders both hooks on the server', () => {

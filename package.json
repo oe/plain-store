@@ -1,7 +1,7 @@
 {
   "name": "plain-store",
-  "version": "0.9.0",
-  "description": "A simple immutable store management for React",
+  "version": "0.10.0",
+  "description": "A tiny React state store with get/set APIs and deep-equal selectors",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.mjs",
   "types": "dist/types/index.d.ts",
@@ -9,8 +9,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "prepublishOnly": "yarn test && yarn build && yarn test:package",
+    "test:watch": "vitest --watch",
+    "prepublishOnly": "npm test && npm run build && npm run test:package",
     "test:package": "node scripts/test-package.mjs"
   },
   "repository": {
@@ -28,8 +28,13 @@
     "react",
     "store",
     "state",
-    "management",
-    "redux"
+    "state-management",
+    "react-state",
+    "global-state",
+    "selector",
+    "typescript",
+    "lightweight",
+    "immutable"
   ],
   "devDependencies": {
     "@preact/signals-react": "^3.0.1",
@@ -49,14 +54,6 @@
   "peerDependencies": {
     "react": ">=18.0.0"
   },
-  "exports": {
-    ".": {
-      "types": "./dist/types/index.d.ts",
-      "import": "./dist/esm/index.mjs",
-      "require": "./dist/cjs/index.js"
-    },
-    "./dist/*": "./dist/*",
-    "./package.json": "./package.json"
-  },
-  "packageManager": "yarn@1.22.22"
+  "packageManager": "yarn@1.22.22",
+  "homepage": "https://github.com/oe/plain-store#readme"
 }

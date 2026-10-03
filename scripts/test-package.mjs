@@ -21,6 +21,11 @@ try {
   for (const [format, load] of [
     ['commonjs', "const { createStore } = require('plain-store');"],
     ['module', "import { createStore } from 'plain-store';"],
+    ['module', "import { createStore } from 'plain-store/dist/esm/index.mjs';"],
+    ['module', "import PlainStore from 'plain-store'; const { createStore } = PlainStore;"],
+    ['commonjs', "const { createStore } = require('plain-store/dist/cjs/index.js');"],
+    ['commonjs', "const { createStore } = require('plain-store/dist/cjs/index');"],
+    ['commonjs', "const { createStore } = require('plain-store/dist/cjs');"],
   ]) {
     execFileSync(process.execPath, [`--input-type=${format}`, '--eval', `${load}
       const store = createStore(1);
@@ -33,6 +38,10 @@ try {
   runInNewContext(readFileSync(join(temporary, 'package/dist/iife/index.js'), 'utf8'), browser);
   assert.equal(browser.PlainStore.createStore(3).get(), 3);
   assert.ok(packed.files.some(({ path }) => path === 'dist/types/index.d.ts'));
+  assert.equal(
+    readFileSync(join(temporary, 'package/dist/esm/index.js'), 'utf8'),
+    readFileSync(join(temporary, 'package/dist/esm/index.mjs'), 'utf8'),
+  );
   for (const extension of ['mts', 'cts']) {
     writeFileSync(join(temporary, `consumer.${extension}`), `
       import { createStore } from 'plain-store';

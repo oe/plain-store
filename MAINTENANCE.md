@@ -24,21 +24,29 @@ No production usage, downstream dependency inventory, or user retention data is 
 - Provide the initial store snapshot for SSR and hydration. Document per-request stores and matching initial client state.
 - Correct comparisons for null-prototype records, ArrayBuffer, and DataView, and make Promise detection consistently return a boolean.
 - Replace obsolete hook test tooling, update build/test dependencies, and run React 18/19 tests, builds, and packed-package checks in CI.
-- Use an explicit `.mjs` ESM entry and conditional package exports. Check CommonJS, ESM, browser IIFE, and TypeScript consumers against the actual tarball.
+- Add an explicit `.mjs` ESM entry while preserving existing file paths and import resolution. Check CommonJS, ESM, browser IIFE, and TypeScript consumers against the actual tarball.
 - Correct README badges and browser paths; document immutability, comparator limits, and async ordering. Remove the unverified 100% coverage claim and universal sub-1-kB claim.
 
-The public store API and deprecated aliases remain available. The ESM artifact moves from `dist/esm/index.js` to `dist/esm/index.mjs`; consumers should import from `plain-store`. Development tools require Node.js 24.15 or later, while consuming applications retain React >=18 as the only peer requirement.
+The public store API and deprecated aliases remain available. The existing `dist/esm/index.js` artifact is retained alongside a new `dist/esm/index.mjs` entry; package-root and deep imports remain compatible. Development tools require Node.js 24.15 or later, while consuming applications retain React >=18 as the only peer requirement.
 
 ## Validation
 
 Locally verified on Node.js 24.19.0 with React/React DOM 18.3.1 and 19.3.0, including their matching TypeScript definitions:
 
-- 45 tests pass for each React version, including selector prop changes, subscription timing, stable object selections, SSR, hydration, and interrupted Suspense renders.
+- 47 tests pass for each React version, including selector prop changes, subscription timing, stable object selections, SSR, hydration, and interrupted Suspense renders.
 - Type checking and production builds pass for both versions.
 - Both packed-package checks pass: CommonJS/ESM imports, IIFE execution with external React, and `.mts`/`.cts` TypeScript consumers (including rejection of invalid partial updates).
 - Yarn audit reports 0 known vulnerabilities after updating the development dependencies. This is an advisory database check, not a guarantee of security.
-- The built CJS/IIFE entry is about 0.98 kB gzipped, and the ESM entry about 1.13 kB gzipped, excluding React. The README therefore avoids a blanket sub-1-kB claim.
+- The built CJS/IIFE entry is about 1.00 kB gzipped, and the ESM entry about 1.15 kB gzipped, excluding React. The README therefore avoids a blanket sub-1-kB claim.
 
 ## Ongoing scope
 
-Fix confirmed bugs and compatibility problems when reported. Before expanding the API, require a concrete consumer need. Reassess after actual adoption evidence becomes available; download counts alone are insufficient. Prepare a release after review rather than automatically publishing or merging maintenance changes.
+Fix confirmed bugs and compatibility problems when reported. Before expanding the API, require a concrete consumer need. Reassess after actual adoption evidence becomes available; download counts alone are insufficient. Publish releases after compatibility and regression checks pass, when requested by the maintainer.
+
+## Release review for 0.10.0
+
+The generated public declarations match the published 0.9.0 declarations exactly. Package checks cover root named/default imports, existing CommonJS file/extensionless/directory imports, both ESM paths, the IIFE, and TypeScript consumers. No exports restriction is introduced. Changes to DataView/ArrayBuffer comparisons and selector evaluation are intentional correctness fixes.
+
+A local production-mode comparison on Node.js 24.19.0, React 18.3.1, and jsdom tested both published 0.9.0 and the new CJS build. Seven measured rounds followed two warmup rounds, alternating version order. With 50 subscribers and 1,000 synchronous updates, unrelated updates caused zero component renders for both versions. Changed snapshots evaluated stable selectors 100,000 times in 0.9.0 versus 50,000 in 0.10.0. In this synthetic run, trivial selected updates took about 71 versus 76 ms, while selectors deriving 200 values took about 1,086 versus 576 ms. These measurements show the fixed safety overhead and avoided duplicate work; they are not browser benchmarks or universal performance claims.
+
+The review retains the concurrency/SSR fixes and narrowly scoped comparator repairs. It adds no state-management features, persistence layer, signal engine, or general-purpose equality framework. SSR retains the initial snapshot until the store is released, which is documented in the changelog.

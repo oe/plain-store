@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config'
 import dts from 'vite-plugin-dts'
+import { copyFileSync } from 'node:fs'
 
 export default defineConfig((env) => {
   if (env.mode === 'development') {
@@ -31,6 +32,7 @@ export default defineConfig((env) => {
       },
     },
     build: {
+      target: 'es2020',
       outDir: 'dist',
       lib: {
         entry: 'src/index.ts',
@@ -48,6 +50,12 @@ export default defineConfig((env) => {
       },
     },
     plugins: [
+      {
+        name: 'preserve-legacy-esm-path',
+        closeBundle() {
+          copyFileSync('dist/esm/index.mjs', 'dist/esm/index.js')
+        },
+      },
       dts({
         outDirs: 'dist/types',
         include: 'src/**/*',
