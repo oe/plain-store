@@ -1,8 +1,6 @@
-/// <reference types="vitest" />
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import dts from 'vite-plugin-dts'
 
-// @ts-expect-error fix vitest type
 export default defineConfig((env) => {
   if (env.mode === 'development') {
     return {
@@ -37,8 +35,8 @@ export default defineConfig((env) => {
       lib: {
         entry: 'src/index.ts',
         name: 'PlainStore',
-        formats: ['esm','cjs', 'iife'],
-        fileName: (format) => `${format}/index.js`
+        formats: ['es', 'cjs', 'iife'],
+        fileName: (format) => format === 'es' ? 'esm/index.mjs' : `${format}/index.js`
       },
       rollupOptions: {
         external: ['react'],
@@ -51,8 +49,7 @@ export default defineConfig((env) => {
     },
     plugins: [
       dts({
-        // rollupTypes: true,
-        outDir: 'dist/types',
+        outDirs: 'dist/types',
         include: 'src/**/*',
       }),
     ],

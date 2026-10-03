@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createStore } from '../src/index';
-import { renderHook } from '@testing-library/react-hooks';
-import { render, screen } from '@testing-library/react';
-
-const waitFor = (time = 0) => new Promise((resolve) => setTimeout(resolve, time));
+import { act, renderHook, render, screen } from '@testing-library/react';
 
 describe('createStore', () => {
   it('should initialize the store with the initial value', () => {
@@ -63,7 +60,7 @@ describe('createStore', () => {
     const { result } = renderHook(() => store.useStore());
     expect(result.current).toBe(10);
 
-    store.set(5);
+    act(() => { store.set(5); });
     expect(result.current).toBe(5);
   });
 
@@ -81,7 +78,7 @@ describe('createStore', () => {
     const { result } = renderHook(() => store.useSelector((value) => value * 2));
     expect(result.current).toBe(20);
 
-    store.set(5);
+    act(() => { store.set(5); });
     expect(result.current).toBe(10);
   });
 
@@ -90,12 +87,12 @@ describe('createStore', () => {
     const { result, unmount } = renderHook(() => store.useSelect((value) => value * 2));
     expect(result.current).toBe(20);
 
-    store.set(10);
+    act(() => { store.set(10); });
     expect(result.current).toBe(20);
-    store.set(6);
+    act(() => { store.set(6); });
     expect(result.current).toBe(12);
     unmount();
-    store.set(12);
+    act(() => { store.set(12); });
     expect(result.current).toBe(12);
   });
 
@@ -104,7 +101,7 @@ describe('createStore', () => {
     const { result } = renderHook(() => store.useSelect((value) => value.length));
     expect(result.current).toBe(3);
 
-    store.set('abc');
+    act(() => { store.set('abc'); });
     expect(result.current).toBe(3);
   });
 
@@ -117,10 +114,10 @@ describe('createStore', () => {
     });
     expect(renderCount).toBe(1);
     expect(result.current).toBe(3);
-    store.set('abc');
+    act(() => { store.set('abc'); });
     expect(renderCount).toBe(1);
     expect(result.current).toBe(3);
-    store.set('abcd');
+    act(() => { store.set('abcd'); });
     expect(renderCount).toBe(2);
     expect(result.current).toBe(4);
   });
@@ -160,13 +157,29 @@ describe('createStore', () => {
     })
     expect(changed).toBe(0);
     const updateAsync = async () => {
-      await waitFor(1000)
       return 'efg'
     }
-    store.set(updateAsync);
+    const update = store.set(updateAsync);
     expect(changed).toBe(0);
-    await waitFor(1000)
+    await update;
     expect(changed).toBe(1);
+  });
+
+  it('preserves the state and propagates rejected async updates', async () => {
+    const store = createStore(1);
+    const error = new Error('update failed');
+    await expect(store.set(async () => { throw error; })).rejects.toBe(error);
+    expect(store.get()).toBe(1);
+  });
+
+  it('merges partial async updates with the current state at resolution', async () => {
+    const store = createStore({ count: 0, name: 'before' });
+    let resolve!: (value: { count: number }) => void;
+    const pending = store.set(() => new Promise<{ count: number }>((done) => { resolve = done; }), true);
+    store.set({ name: 'after' }, true);
+    resolve({ count: 1 });
+    await pending;
+    expect(store.get()).toEqual({ count: 1, name: 'after' });
   });
 
   it('without custom comparator', async () => {
