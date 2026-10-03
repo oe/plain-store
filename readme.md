@@ -1,137 +1,227 @@
 <h1 align="center">plain-store</h1>
-<div align="center">
-  <a href="https://github.com/oe/plain-store/actions/workflows/build.yml">
-    <img src="https://github.com/oe/template-to-react/actions/workflows/build.yml/badge.svg" alt="Github Workflow">
-  </a>
-  <a href="#readme">
-    <img src="https://img.shields.io/badge/%3C%2F%3E-typescript-blue" alt="code with typescript" height="20">
-  </a>
-  <a href="#readme">
-    <img src="https://img.shields.io/badge/coverage-100%25-44CC11" alt="code coverage" height="20">
-  </a>
-  <a href="#readme">
-    <img src="https://badge.fury.io/js/plain-store.svg" alt="npm version" height="20">
-  </a>
-  <a href="https://www.npmjs.com/package/plain-store">
-    <img src="https://img.shields.io/npm/dm/plain-store.svg" alt="npm version" height="20">
-  </a>
-</div>
-A dead simple immutable store for react to manage state in your application, redux alternative in less than 1kb gzipped. Signal like store, no reducer, no context, no provider, no HOC, no epic.
+<p align="center">A tiny React state store with get/set APIs and deep-equal selectors.</p>
+<p align="center">
+  <a href="https://github.com/oe/plain-store/actions/workflows/build.yml"><img src="https://github.com/oe/plain-store/actions/workflows/build.yml/badge.svg" alt="Build and tests"></a>
+  <a href="https://www.npmjs.com/package/plain-store"><img src="https://img.shields.io/npm/v/plain-store.svg" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/plain-store"><img src="https://img.shields.io/npm/dm/plain-store.svg" alt="Monthly downloads"></a>
+</p>
+
+Share UI state between React components and update it from ordinary JavaScript. Create a store, read it with a hook, and update it with `set` — no Provider or reducer setup.
+
+- **Small API:** `get`, `set`, `subscribe`, `useStore`, and `useSelector`.
+- **Object selectors:** deeply equal selections retain their previous reference, so unrelated store updates do not trigger a render.
+- **TypeScript:** inferred state types and checked partial updates.
+- **React 18+:** tested on React 18 and 19, including server rendering and hydration.
+- **No extra runtime dependencies:** React is the only peer dependency. The minified CJS/browser build is approximately 1 kB gzipped, excluding React; format and build settings affect size.
 
 ## Installation
-```bash
-# npm
-npm install plain-store
-# yarn
-yarn add plain-store
 
+```bash
+npm install plain-store
+# or
+yarn add plain-store
 ```
 
-## Usage
-using with bundler or es module
-```javascript
-import { createStore, isDeepEqual } from 'plain-store';
+## Quick start
 
-const initialState = {
-  count: 0
-};
+```tsx
+import { createStore } from 'plain-store';
 
-const store = createStore(initialState);
-store.set({ count: 1 });
+const counter = createStore({ count: 0 });
 
 function Counter() {
-  const { count } = store.useStore();
-  // derive a new value from the store value
-  const doubled = store.useSelector((state) => state.count * 2);
+  const count = counter.useSelector((state) => state.count);
   return (
-    <div>
-      <div>count: {count}</div>
-      <div>doubled: {doubled}</div>
-      <button onClick={() => store.set((prev) => ({ count: 1 + prev.count }))}>Increment</button>
-    </div>
+    <button onClick={() => counter.set((state) => ({ count: state.count + 1 }))}>
+      Count: {count}
+    </button>
   );
 }
 
-store.get(); // { count: 1 }
-store.set((prev) => ({ count: 2 + prev.count })); // { count: 3 }, will trigger Counter re-render
+// The same API works outside a component.
+counter.set({ count: 10 });
+console.log(counter.get().count); // 10
 ```
 
-using with script tag
+Use `counter.useStore()` when a component needs the entire state. It updates on every accepted store change; use a selector when the component needs a subset.
+
+## Share filters without rerendering for unrelated changes
+
+A selector can return an object without an extra equality helper:
+
+```tsx
+const ui = createStore({ query: '', sort: 'name', panelOpen: false });
+
+function SearchFilters() {
+  const { query, sort } = ui.useSelector((state) => ({
+    query: state.query,
+    sort: state.sort,
+  }));
+
+  return (
+    <input
+      aria-label={`Search, sorted by ${sort}`}
+      value={query}
+      onChange={(event) => ui.set({ query: event.target.value }, true)}
+    />
+  );
+}
+
+function PanelButton() {
+  const open = ui.useSelector((state) => state.panelOpen);
+  return (
+    <button onClick={() => ui.set({ panelOpen: !open }, true)}>
+      {open ? 'Close panel' : 'Open panel'}
+    </button>
+  );
+}
+```
+
+Changing `panelOpen` does not trigger a store-driven render of `SearchFilters`: its selected `query` and `sort` are unchanged. Parent renders and local React state can still render the component. Selectors may also depend on props; keep them pure because React can evaluate them more than once.
+
+## When to choose plain-store
+
+Use it for shared client-side UI state when you prefer a small, explicit store object and deep equality by default. Filters, dialogs, selections, and independent React widgets are good starting points.
+
+| Choice | When it fits |
+| --- | --- |
+| React `useState` / `useReducer` | State belongs to a component or can be shared by lifting it to a parent. |
+| plain-store | You want `get/set/subscribe` outside React, hooks inside React, and deeply compared selectors with little setup. |
+| [Zustand](https://github.com/pmndrs/zustand) | You want a similar lightweight store with an established ecosystem, persistence, and DevTools integrations. |
+| [Jotai](https://github.com/pmndrs/jotai) | You prefer atoms and composed derived state. |
+| [TanStack Query](https://tanstack.com/query) | You need server-data fetching, caching, synchronization, and retries. |
+
+Zustand also works without a Provider and exposes an external store API. plain-store's default deep equality is a convenience, not a general speed advantage: comparisons cost work, especially for large values. plain-store does not provide persistence, DevTools, automatic signal dependency tracking, or request caching.
+
+## API
+
+### `createStore(initialState, options?)`
+
+Pass a value or a synchronous initializer. Function values themselves cannot be stored as the root state; object properties may contain functions.
+
+```ts
+const count = createStore(0);
+const preferences = createStore(() => ({ theme: 'light' }));
+const fastCount = createStore(0, { comparator: Object.is });
+```
+
+`options.comparator(a, b)` defaults to `isDeepEqual`. The same comparator checks both whole-state updates and selector results, so it must handle both kinds of value. Choose a comparator that fits your state size and update frequency; reference comparison requires stable references for object selections.
+
+### `store.get()`
+
+Return the current state without subscribing. The return type is shallow `Readonly<T>`; state is not cloned or frozen.
+
+### `store.set(valueOrUpdater, options?)`
+
+**Replace the entire state by default.** Use `true` or `{ partial: true }` to shallow-merge an object update with the current state.
+
+```ts
+const profile = createStore({ name: 'Saiya', age: 20 });
+
+profile.set({ name: 'Saiya', age: 21 });
+profile.set({ age: 22 }, true); // preserves name
+profile.set((state) => ({ age: state.age + 1 }), { partial: true });
+```
+
+Partial updates are intended for object records. Always replace changed objects, arrays, Maps, and Sets. Mutating an existing state reference can prevent updates from being detected.
+
+An updater receives the current state and may return a Promise. The setter returns `void` for synchronous updates and a Promise for asynchronous updates.
+
+```ts
+await profile.set(async () => ({ age: await loadAge() }), true);
+```
+
+Async results apply in resolution order. Older requests are not canceled and can overwrite newer results. Partial async updates merge with the state at resolution time. A rejected updater does not apply its result; other updates may still have changed the store. Catch the returned Promise's rejection as you would for any other async operation.
+
+### `store.useStore()`
+
+React hook returning the whole state and subscribing to accepted changes.
+
+### `store.useSelector(selector)`
+
+React hook returning a selected value. Store changes trigger a render when the comparator considers that selection different. Equal selections retain their previous reference. This is a subscription hook, not a shared computed-value cache: different subscribers evaluate their own selectors.
+
+### `store.subscribe(listener)`
+
+Subscribe outside React. The callback receives no arguments and runs after an accepted update; use `get()` to read the latest state. It is not called immediately on subscription.
+
+```ts
+const unsubscribe = profile.subscribe(() => {
+  console.log(profile.get());
+});
+unsubscribe();
+```
+
+### `isDeepEqual(a, b)`
+
+Exported comparator for primitives, objects, arrays, RegExp, Date, Map, Set, typed arrays, ArrayBuffer, and DataView. Null-prototype records are supported. Map keys and Set members use identity equality.
+
+The comparator does not handle cyclic structures or compare symbol-keyed object properties. It is not a universal comparator for arbitrary class instances; custom `valueOf` and `toString` methods affect comparisons. Use a custom comparator for unsupported values.
+
+### `isPromiseLike(value)`
+
+Return a boolean indicating whether a value is a Promise or has a callable `then` method.
+
+### Compatibility aliases
+
+`getStore`, `setStore`, and `useSelect` remain available as deprecated aliases of `get`, `set`, and `useSelector`.
+
+## Server rendering and hydration
+
+Both hooks use the initial value passed to `createStore` as the server snapshot. Prepare your data before creating the store, create a separate store for each request, and initialize the browser store with the same serialized state.
+
+```ts
+function createPageStore(initialState: { query: string }) {
+  return createStore(initialState);
+}
+
+// Server: one instance per request, after preparing the initial state.
+const serverStore = createPageStore({ query: 'react' });
+// Browser: recreate using the initial state serialized by the server.
+const browserStore = createPageStore({ query: 'react' });
+```
+
+Pass the appropriate instance to your components using your application's props or context. Avoid sharing a mutable module-level store across server requests. Calling `set` after creation does not change the server snapshot; browser updates made before hydration apply after React hydrates that initial snapshot.
+
+In frameworks using React Server Components, call these hooks from Client Components. Server rendering support here refers to React DOM rendering and hydration, not running hooks in Server Components.
+
+## Browser script
+
+For a React 18 application using UMD scripts:
+
 ```html
-<!-- include react -->
-<script src="https://cdn.jsdelivr.net/npm/react/umd/react.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/plain-store/dist/index.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/plain-store@0.10.0/dist/iife/index.js"></script>
 <script>
-  const { createStore, isDeepEqual } = PlainStore;
-  const store = createStore({ count: 0 });
-  store.set({ count: 1 });
+  const counter = PlainStore.createStore(0);
+  counter.set(1);
 </script>
 ```
 
-## API
-### createStore(initialState, options?)
-Create a store with the initial state.
-```ts
-import { createStore } from 'plain-store';
+Use package imports with a bundler for React 19 applications. The browser build expects React to be provided separately.
 
-interface ICreateStoreOptions<T> {
-  /**
-   * custom comparator for store value changes, default to `isDeepEqual`
-   * * use it when the default comparator is not working as expected
-   * * `isDeepEqual` works for most cases, but it's not perfect, you can provide a custom comparator to handle the edge cases or performance issues.
-   */
-  comparator?: (a: any, b: any) => boolean;
-}
+## Upgrading from 0.9.x
 
-interface ISetStoreOptions {
-  /**
-   * only update the partial value of the store,
-   * * the new value will be merged with the old value
-   */
-  partial?: boolean;
-}
+The store API, deprecated aliases, React >=18 peer requirement, and existing `dist/cjs/index.js`, `dist/esm/index.js`, `dist/iife/index.js`, and `dist/types/index.d.ts` paths remain available. A `.mjs` ESM entry is added for explicit native ESM imports; package-root imports continue to work.
 
-type ISetStoreOptionsType = boolean | ISetStoreOptions
+Version 0.10.0 fixes stale selectors when props change, updates missed before subscription, interrupted-render selector handling, server rendering, and comparator edge cases. Selectors may be evaluated at different times or more often than before; they must be pure. See [the changelog](https://github.com/oe/plain-store/blob/main/CHANGELOG.md) for details.
 
-interface IStore<T> {
-  // listen to the store value changes, return a function to unsubscribe.
-  subscribe: (listener: () => void) => () => void;
-  // Get the current state of the store, none reactive, could be used anywhere.
-  get: () => Readonly<T>;
-  // Set the state of the store, could be used anywhere, callback could be async.
-  // * return a promise if the params is async function
-  // * use getStore() to get the latest state of the store when using async function
-  // * use partial option to update the partial value of the store
-  set: (newValue: T | ((prev: T) => (T | Promise<T>)), cfg?: ISetStoreOptionsType): void | Promise<void>
-  // react hook to get the current state of the store.
-  useStore: () => Readonly<T>;
-  // react hook to select a part of the state.
-  useSelector: <R>(selector: (state: T) => R) => Readonly<R>;
-}
-function createStore<T>(initialState: T | (() => T), options?: ICreateStoreOptions<T>): IStore<T>;
+## Development
+
+Development tools require Node.js 24.15+ and Yarn 1.22.22. Applications consuming the package do not inherit this tooling requirement.
+
+```bash
+yarn install --frozen-lockfile
+yarn test
+yarn build
+yarn test:package
+# Optional: run the local examples or watch tests.
+yarn dev
+yarn test:watch
 ```
 
-```ts
-// always use a new object to update the store value
-store.set((prev) => ({ ...prev, newItem: 'xxx' }))
-```
-
-### isDeepEqual(a, b)
-Check if two values are deeply equal, can efficiently compare common data structures like objects, arrays, regexp, date and primitives.
-```ts
-import { isDeepEqual } from 'plain-store';
-function isDeepEqual(a: any, b: any): boolean;
-```
-
-### isPromiseLike(obj)
-Check if a value is a promise
-
-```ts
-import { isPromiseLike } from 'plain-store';
-function isPromiseLike(obj: any): boolean;
-```
+CI checks React 18 and 19, TypeScript, production builds, and the actual package tarball (CommonJS, ESM, browser IIFE, and declaration files). [Examples](https://github.com/oe/plain-store/tree/main/demo) are available in the repository. The demo timing loops are exploratory examples, not comparative performance guarantees.
 
 ## License
-MIT
 
-
+[MIT](https://github.com/oe/plain-store/blob/main/LICENSE)

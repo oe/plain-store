@@ -1,4 +1,4 @@
-import { useSyncExternalStore, useRef, useCallback } from 'react';
+import { useSyncExternalStore, useRef, useMemo, useEffect } from 'react';
 
 /**
  * Get a subset of a type
@@ -46,6 +46,17 @@ export function isDeepEqual(a: any, b: any) {
     }
     return true;
   }
+  if (constructor === ArrayBuffer || constructor === DataView) {
+    if (a.byteLength !== b.byteLength) return false;
+    const bytesA = constructor === DataView
+      ? new Uint8Array(a.buffer, a.byteOffset, a.byteLength) : new Uint8Array(a);
+    const bytesB = constructor === DataView
+      ? new Uint8Array(b.buffer, b.byteOffset, b.byteLength) : new Uint8Array(b);
+    for (let i = 0; i < bytesA.length; i++) {
+      if (bytesA[i] !== bytesB[i]) return false;
+    }
+    return true;
+  }
   if (ArrayBuffer.isView(a) && ArrayBuffer.isView(b)) {
     // @ts-expect-error a and b are TypedArray
     let length = a.length;
@@ -59,8 +70,8 @@ export function isDeepEqual(a: any, b: any) {
     // If no differences found
     return true;
   }
-  if (a.valueOf !== Object.prototype.valueOf) return a.valueOf() === b.valueOf();
-  if (a.toString !== Object.prototype.toString) return a.toString() === b.toString();
+  if (typeof a.valueOf === 'function' && typeof b.valueOf === 'function' && a.valueOf !== Object.prototype.valueOf) return a.valueOf() === b.valueOf();
+  if (typeof a.toString === 'function' && typeof b.toString === 'function' && a.toString !== Object.prototype.toString) return a.toString() === b.toString();
   if (Object.keys(a).length !== Object.keys(b).length) return false;
   for (const key in a) {
     if (
@@ -77,7 +88,7 @@ export function isDeepEqual(a: any, b: any) {
  * Check if a value is a promise
  */
 export function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
-  return value instanceof Promise || (value && typeof (value as any).then === 'function')
+  return value instanceof Promise || !!(value && typeof (value as any).then === 'function')
 }
 
 /**
@@ -109,6 +120,7 @@ export type ISetStoreOptionsType = boolean | ISetStoreOptions
 export function createStore<T>(initialValue: IInitialState<T>, options?: ICreateStoreOptions) {
   const { comparator = isDeepEqual } = options || {};
   let currentValue: Readonly<T> = typeof initialValue === 'function' ? initialValue() : initialValue;
+  const initialSnapshot = currentValue;
   const listeners = new Set<() => void>();
 
   const subscribe = (callback: () => void) => {
@@ -117,25 +129,38 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
   };
 
   const getSnapshot = () => currentValue;
+  const getServerSnapshot = () => initialSnapshot;
 
-  const useStore = () => useSyncExternalStore(subscribe, getSnapshot);
+  const useStore = () => useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const useSelector = <R>(converter: (value: T) => R): Readonly<R> => {
-    const lastInfo = useRef({ value: converter(currentValue), converter });
-    lastInfo.current.converter = converter;
-
-    const subscribeChange = useCallback((callback: () => void) => {
-      // wrap the callback to compare the new value with the old value
-      const wrappedCallback = () => {
-        const newValue = lastInfo.current.converter(currentValue);
-        if (comparator(lastInfo.current.value, newValue)) return;
-        lastInfo.current.value = newValue;
-        callback();
+    const committed = useRef<{ value: R } | undefined>(undefined);
+    const [getSelection, getServerSelection] = useMemo(() => {
+      // Keep this cache local to the selector so interrupted renders cannot
+      // replace the selector or snapshot used by the committed subscription.
+      let cached: { snapshot: Readonly<T>; value: R } | undefined;
+      const select = (snapshot: Readonly<T>) => {
+        if (cached && Object.is(cached.snapshot, snapshot)) return cached.value;
+        const next = converter(snapshot);
+        const previous = cached || committed.current;
+        const value = previous && comparator(previous.value, next) ? previous.value : next;
+        if (cached) {
+          cached.snapshot = snapshot;
+          cached.value = value;
+        } else {
+          cached = { snapshot, value };
+        }
+        return value;
       };
-      return subscribe(wrappedCallback);
-    }, []);
+      return [() => select(getSnapshot()), () => select(getServerSnapshot())];
+    }, [converter]);
 
-    return useSyncExternalStore(subscribeChange, () => lastInfo.current.value);
+    const value = useSyncExternalStore(subscribe, getSelection, getServerSelection);
+    useEffect(() => {
+      if (committed.current) committed.current.value = value;
+      else committed.current = { value };
+    }, [value]);
+    return value;
   };
 
   function setStore(
