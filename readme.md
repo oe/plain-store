@@ -14,7 +14,7 @@ Share UI state between React components and update it from ordinary JavaScript. 
 - **React 18+:** tested on React 18 and 19, including server rendering and hydration.
 - **No extra runtime dependencies:** React is the only peer dependency. The minified CJS/browser build is approximately 1 kB gzipped, excluding React; format and build settings affect size.
 
-ESM builds allow bundlers to remove unused exports and unused package imports. The browser IIFE contains the full library. CI enforces gzip budgets of 1,250 bytes for ESM and 1,100 bytes for CJS/IIFE, excluding React.
+ESM builds allow bundlers to remove unused exports and unused package imports. The browser IIFE contains the full library. CI enforces gzip budgets of 1,350 bytes for ESM and 1,200 bytes for CJS/IIFE, excluding React.
 
 [Compare performance and bundle size with Zustand and Jotai](#benchmarks), including where each configuration fits.
 
@@ -99,43 +99,47 @@ Zustand also works without a Provider and exposes an external store API. plain-s
 
 ## Benchmarks
 
-plain-store combines **built-in deep equality, suppression of deeply equal writes, and a small API**. The comparison below measures those tradeoffs alongside configured alternatives. It does not establish a universal fastest library.
+plain-store combines **built-in deep equality, suppression of deeply equal writes, and a small API**. The comparison measures these tradeoffs alongside configured alternatives; it does not establish a universal fastest library. **The current PR includes unreleased shared-selector optimizations. Published 0.10.0 is measured separately in the same process as the baseline.**
 
 ### Bundle size for equivalent object selections
 
-Minified consumer fixtures expose a selected-state hook and a setter. Values are gzip **bytes**, excluding React and including the equality helpers each configuration needs:
+Minified consumer fixtures expose a selected-state hook and a setter. Values are gzip **bytes**, excluding React and including each configuration's equality support:
 
 | Configuration | Flat object selection | Deep object selection |
 | --- | ---: | ---: |
-| plain-store, default equality | 1,227 | 1,253 |
+| plain-store PR, default equality (unreleased) | 1,342 | 1,368 |
 | Zustand/traditional + fast-deep-equal | 2,026 | 2,055 |
 | Zustand + useShallow | 914 | — |
 | Jotai + selectAtom + equality function | 3,823 | 4,432 |
 
-For this deep-selection fixture, plain-store supplies the behavior in about **1.25 kB** without an extra equality dependency. Zustand's shallow-only fixture is smaller; shallow equality does not handle the fresh nested objects in the deep fixture. These numbers measure the fixtures, not whole apps or package download sizes. Build settings and usage affect size.
+The deep-selection fixture costs about **1.37 kB** for plain-store without an extra equality dependency. Zustand's shallow-only fixture is smaller; shallow equality does not handle the fresh nested objects in the deep fixture. These are fixture costs, not whole apps or package download sizes. Build settings and usage affect size.
 
 ### Update and selector costs
 
-Snapshot from **2026-10-04**: plain-store 0.10.0, Zustand 5.0.15, Jotai 3.0.1; production React/React DOM 18.3.1, Node 24.19.0, jsdom 30.1.1, Linux x64 on Intel Xeon Platinum 8573C. React cases use 20 mounted subscribers and 500 synchronous updates; lists contain 5,000 items. Times are **median milliseconds**, lower is less time, after two warmup and seven measured rounds with rotated library order:
+Snapshot from **2026-10-04**: plain-store PR (unreleased) and npm 0.10.0 baseline, Zustand 5.0.15, Jotai 3.0.1; production React/React DOM 18.3.1, Node 24.19.0, jsdom 30.1.1, Linux x64 on Intel Xeon Platinum 8573C. React cases use 20 mounted subscribers and 500 synchronous updates; lists contain 5,000 items. Times are **median milliseconds**, lower is less time, after two warmup and seven measured rounds with rotated library order:
 
-| Workload | plain-store | Zustand | Jotai |
-| --- | ---: | ---: | ---: |
-| 100,000 writes, one listener, no React | 10.11 | 2.83 | 139.87 |
-| Primitive selection, unrelated updates | 0.64 | 0.39 | 3.11 |
-| Primitive selection, selected updates | 17.27 | 16.43 | 23.52 |
-| Object selection, unrelated updates | 1.25 | 0.88 | 3.94 |
-| Object selection, selected updates | 16.85 | 16.90 | 21.23 |
-| Nested selection, unrelated updates | 2.77 | 2.13 | 2.41 |
-| Uncached list, unrelated updates | 390.40 | 405.49 | 22.93 |
-| Uncached list, filter changes each update | 263.76 | 261.79 | 32.35 |
-| Cached list, unrelated updates | 0.55 | 0.32 | 2.11 |
-| Cached list, filter changes each update | 28.72 | 26.79 | 31.19 |
+| Workload | plain-store PR | npm 0.10.0 | Zustand | Jotai |
+| --- | ---: | ---: | ---: | ---: |
+| 100,000 writes, one listener, no React | 9.54 | 9.94 | 2.81 | 148.61 |
+| Primitive selection, unrelated updates | 0.66 | 0.64 | 0.30 | 3.10 |
+| Primitive selection, selected updates | 17.53 | 17.30 | 15.10 | 23.95 |
+| Shared object selection, unrelated updates | 0.67 | 1.28 | 0.85 | 2.83 |
+| Shared object selection, selected updates | 19.37 | 17.46 | 18.77 | 24.74 |
+| Component-local object, unrelated updates | 1.91 | 1.16 | 0.84 | 29.91 |
+| Component-local object, selected updates | 22.68 | 24.59 | 20.36 | 55.51 |
+| Shared nested selection, unrelated updates | 0.84 | 3.15 | 2.28 | 2.99 |
+| Shared uncached list, unrelated updates | 21.30 | 386.95 | 398.88 | 21.50 |
+| Shared uncached list, filter changes each update | 28.88 | 262.96 | 262.80 | 33.20 |
+| Cached list, unrelated updates | 0.76 | 0.71 | 0.37 | 2.42 |
+| Cached list, filter changes each update | 30.08 | 28.78 | 29.10 | 35.45 |
 
-Zustand uses its native hook for primitives and `traditional` + fast-deep-equal for objects/arrays. The additional `useShallow` flat-object configuration measured 2.38 ms for unrelated updates and 26.42 ms for selected updates; all configurations skip unrelated renders. Jotai shares one selected atom between subscribers, preserving its native calculation sharing. Cached cases give **all three libraries the same application-level cache**.
+Zustand uses its native hook for primitives and `traditional` + fast-deep-equal for objects/arrays. The additional `useShallow` flat-object configuration measured 2.25 ms for unrelated updates and 25.97 ms for selected updates. Jotai shares one selected atom in shared cases and uses component-local atoms in local cases. All configurations skip unrelated renders. Cached-list cases give **every library the same application-level cache**.
 
-An observable default behavior is write deduplication: 500 fresh state objects with unchanged contents produced **zero notifications and zero selector calls** in plain-store, versus 500 notifications in Zustand and Jotai. Object selectors ran 10,000 times in Zustand and 500 times in Jotai; none rendered. This diagnostic compares different default write semantics, so it is not included in the timing table. Other libraries can add an equality guard before writing.
+The shared uncached-list optimization reduces filtering from **10,000 to 500 operations**. In this run, unrelated updates fell from about 387 to 21 ms, approaching Jotai's shared-atom cost. Changing the filter still renders 10,000 times in every configuration. Distinct component-local selectors do not share work and can be slower because of cache lookups; the table includes that cost. Simple or already cached selectors do not gain uniformly. The library gzip footprint grows by 98–116 bytes over 0.10.0; budgets increase by 100 bytes to preserve a small margin for builds and compatibility guards.
 
-The results favor Zustand for raw update overhead and Jotai for shared uncached derivations. plain-store's advantage is getting deep selections and write deduplication by default with a small footprint. The cache recipe below avoids repeated list work, but the same technique benefits other stores. Small timing differences and overlapping quartile ranges do not establish an app-level advantage; Node/jsdom does not measure browser paint or interaction latency.
+Default write deduplication is unchanged: 500 fresh root objects with unchanged contents produce **zero notifications and zero selector calls** in both plain-store versions, versus 500 notifications in Zustand and Jotai. Object selectors run 10,000 times in Zustand and 500 times in Jotai; none renders. This diagnostic compares different default write semantics, so it is not included in the timing table. Other libraries can add an equality guard before writing.
+
+Zustand retains lower raw update overhead. Jotai offers native shared derivations and can model independent input atoms; that topology is outside this root-store comparison. plain-store's niche is default deep equality and write deduplication with a small footprint, now including snapshot-level sharing for identical selector functions. Small timing differences and overlapping quartiles do not establish an app-level advantage; Node/jsdom does not measure browser paint or interaction latency.
 
 ```sh
 npm run benchmark:compare
@@ -143,11 +147,11 @@ npm run benchmark:compare
 npm run benchmark:compare -- /tmp/comparison.json
 ```
 
-[Methodology and adapters](benchmarks/README.md), [React 18 raw samples and counts](benchmarks/results/react-18.json), and [React 19 results](benchmarks/results/react-19.json) include versions, quartiles, source hashes and machine metadata. CI validates outputs, render/computation counts and bundled imports on React 18/19; timing rankings are not pass/fail checks. The comparison dependencies are isolated from the published library.
+[Methodology and adapters](benchmarks/README.md), [React 18 raw samples and counts](benchmarks/results/react-18.json), and [React 19 results](benchmarks/results/react-19.json) include versions, quartiles, source hashes and machine metadata. CI validates outputs, render/computation counts and bundled imports on React 18/19; timing rankings do not decide success. Benchmark dependencies are isolated from the published library. The PR optimizations are not in npm 0.10.0 yet.
 
 ## Large lists and frequent updates
 
-Skipping a render does not skip selector computation. A selector such as `state.todos.filter(...)` still scans the list on every accepted update, even when only an unrelated field changes. `useCallback` stabilizes a selector function; it does not cache its derived result across changed snapshots.
+Skipping a render does not skip selector computation. The unreleased implementation shares one calculation for the same selector function in the latest snapshot; a selector such as `state.todos.filter(...)` still scans the list on each accepted update, even when only an unrelated field changes. Separate inline functions do not share calculations. `useCallback` stabilizes a function within a component; it does not make different components' functions identical or cache derived results across changed snapshots.
 
 For expensive derivations, cache one result by the inputs it actually uses. Create the selector once alongside its store, and share it between components that need the same result:
 
@@ -228,7 +232,11 @@ React hook returning the whole state and subscribing to accepted changes.
 
 ### `store.useSelector(selector)`
 
-React hook returning a selected value. Store changes trigger a render when the comparator considers that selection different. Equal selections retain their previous reference. This is a subscription hook, not a shared computed-value cache: different subscribers evaluate their own selectors.
+React hook returning a selected value. Store changes trigger a render when the comparator considers that selection different. Equal selections retain their previous reference.
+
+In the unreleased implementation, components passing the **same pure selector function object** share its computation in the store's latest selected snapshot. Use `store.useSelector(selectVisibleTodos)` to share a named selector; `store.useSelector(state => selectVisibleTodos(state))` creates a separate function. Default equality can share stabilized results, while custom comparators retain each subscriber's own comparison history. Changing selectors still recomputes correctly, and per-hook snapshot caches preserve concurrent rendering and hydration behavior.
+
+Selectors must derive their result from the snapshot and captured props represented by their function identity. Treat selected values as immutable because references may be shared. Accepted writes clear shared results; weak function keys allow abandoned functions to be collected. The cache retains latest results while the store and keys remain alive. Reading an older snapshot may recompute it. This adds a small fixed cost to cheap/distinct selectors and provides no automatic field dependency tracking. Published 0.10.0 evaluates selectors per subscriber; these changes are pending release.
 
 ### `store.subscribe(listener)`
 

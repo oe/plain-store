@@ -39,6 +39,8 @@ const workloads = [
   { id: 'primitive/selected', kind: 'primitive', select: (s) => s.count, next: (s, i) => ({ ...s, count: i }), renders: config.updates * config.subscribers },
   { id: 'object/unrelated', kind: 'flat', select: flat, next: (s, i) => ({ ...s, other: i }), renders: 0 },
   { id: 'object/selected', kind: 'flat', select: flat, next: (s, i) => ({ ...s, count: i }), renders: config.updates * config.subscribers },
+  { id: 'local-object/unrelated', kind: 'local', select: flat, next: (s, i) => ({ ...s, other: i }), renders: 0 },
+  { id: 'local-object/selected', kind: 'local', select: flat, next: (s, i) => ({ ...s, count: i }), renders: config.updates * config.subscribers },
   { id: 'nested/unrelated', kind: 'deep', select: nested, next: (s, i) => ({ ...s, other: i }), renders: 0 },
   { id: 'derived/unrelated', kind: 'deep', select: derive, next: (s, i) => ({ ...s, other: i }), renders: 0 },
   { id: 'derived/selected', kind: 'deep', select: derive, next: (s, i) => ({ ...s, filter: i % 2 ? 'done' : 'active' }), renders: config.updates * config.subscribers },
@@ -91,12 +93,12 @@ async function sample(adapter, workload) {
   const metrics = { ms, selections, derivations, renders, notifications };
   const finalState = store.get();
   assert.equal(finalState.other, workload.id.endsWith('/unrelated') ? config.updates : 0);
-  assert.equal(finalState.count, ['object/selected', 'primitive/selected'].includes(workload.id) ? config.updates : 0);
+  assert.equal(finalState.count, ['object/selected', 'primitive/selected', 'local-object/selected'].includes(workload.id) ? config.updates : 0);
   assert.equal(finalState.filter, 'active');
   for (const value of observed) assert.deepEqual(value, workload.select(finalState));
   assert.equal(container.children.length, config.subscribers);
   assert.equal(renders, workload.renders, `${adapter.name} ${workload.id}: render count`);
-  assert.equal(notifications, workload.id.startsWith('equal-write') && adapter.name === 'plain-store' ? 0 : config.updates);
+  assert.equal(notifications, workload.id.startsWith('equal-write') && adapter.deepWrites ? 0 : config.updates);
   if (workload.cached) assert.equal(metrics.derivations, workload.id.endsWith('/selected') ? config.updates : 0);
   flushSync(() => root.unmount());
   unsubscribe();
@@ -157,8 +159,10 @@ const output = {
     date: new Date().toISOString(), node: process.version, react: React.version,
     reactDOM: rootRequire('react-dom/package.json').version,
     libraries: { 'plain-store': rootRequire('./package.json').version, Zustand: version('zustand'), Jotai: version('jotai'),
+      'plain-store 0.10.0': version('plain-store'),
       'fast-deep-equal': version('fast-deep-equal'), 'use-sync-external-store': version('use-sync-external-store') },
     platform: platform(), arch: arch(), cpu: cpus()[0].model, logicalCPUs: cpus().length,
+    sources: { 'plain-store': 'working tree (unreleased)', 'plain-store 0.10.0': 'npm release' },
     mode: 'production', environment: 'jsdom', jsdom: version('jsdom'), vite: version('vite'), config,
     gitRevision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: rootDir, encoding: 'utf8' }).trim(),
     sourceHashes: Object.fromEntries(hashedPaths.map((path) => [path, createHash('sha256').update(readFileSync(resolve(rootDir, path))).digest('hex')])),

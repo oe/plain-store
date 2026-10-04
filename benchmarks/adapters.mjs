@@ -1,4 +1,6 @@
 import { createStore as createPlainStore } from '../dist/esm/index.mjs';
+import { createStore as createBaselineStore } from 'plain-store/dist/esm/index.mjs';
+import { useMemo } from 'react';
 import { createStore as createZustandStore } from 'zustand/vanilla';
 import { useStore as useZustandStore } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
@@ -10,13 +12,31 @@ import deepEqual from 'fast-deep-equal';
 export const adapters = [
   {
     name: 'plain-store',
-    create(initial, select) {
+    deepWrites: true,
+    create(initial, select, kind) {
       const store = createPlainStore(initial);
       return {
         get: store.get,
         set: store.set,
         subscribe: store.subscribe,
-        useSelection: () => store.useSelector(select),
+        useSelection: kind === 'local'
+          ? () => store.useSelector((state) => select(state))
+          : () => store.useSelector(select),
+      };
+    },
+  },
+  {
+    name: 'plain-store 0.10.0',
+    deepWrites: true,
+    create(initial, select, kind) {
+      const store = createBaselineStore(initial);
+      return {
+        get: store.get,
+        set: store.set,
+        subscribe: store.subscribe,
+        useSelection: kind === 'local'
+          ? () => store.useSelector((state) => select(state))
+          : () => store.useSelector(select),
       };
     },
   },
@@ -28,7 +48,9 @@ export const adapters = [
         get: store.getState,
         set: (next) => store.setState(next, true), // full replacement, like plain-store
         subscribe: store.subscribe,
-        useSelection: kind === 'primitive'
+        useSelection: kind === 'local'
+          ? () => useStoreWithEqualityFn(store, (state) => select(state), deepEqual)
+          : kind === 'primitive'
           ? () => useZustandStore(store, select)
           : () => useStoreWithEqualityFn(store, select, deepEqual),
       };
@@ -36,7 +58,7 @@ export const adapters = [
   },
   {
     name: 'Jotai',
-    create(initial, select) {
+    create(initial, select, kind) {
       const store = createJotaiStore();
       const state = atom(initial);
       // One shared selected atom is idiomatic: let Jotai share computations.
@@ -45,7 +67,10 @@ export const adapters = [
         get: () => store.get(state),
         set: (next) => store.set(state, next),
         subscribe: (callback) => store.sub(state, callback),
-        useSelection: () => useAtomValue(selected, { store }),
+        useSelection: kind === 'local' ? () => {
+          const local = useMemo(() => selectAtom(state, (value) => select(value), deepEqual), [select]);
+          return useAtomValue(local, { store });
+        } : () => useAtomValue(selected, { store }),
       };
     },
   },

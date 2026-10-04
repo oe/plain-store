@@ -53,8 +53,8 @@ function sample(name, related) {
       ? { filter: progress % 2 ? 'done' : 'active' } : {}) }, true));
   }
   const ms = performance.now() - start;
-  assert.equal(selections, subscribers * updates);
-  assert.equal(derivations, name.startsWith('uncached') ? subscribers * updates : related ? updates : 0);
+  assert.equal(selections, updates); // Same selector is shared by every observer.
+  assert.equal(derivations, name.startsWith('uncached') ? updates : related ? updates : 0);
   assert.equal(renders, related ? subscribers * updates : 0);
   assert.deepEqual(lastSelected, todos.filter((todo) => !todo.done));
   flushSync(() => root.unmount());

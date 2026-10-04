@@ -122,6 +122,12 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
   let currentValue: Readonly<T> = typeof initialValue === 'function' ? initialValue() : initialValue;
   const initialSnapshot = currentValue;
   const listeners = new Set<() => void>();
+  // One shared snapshot; accepted writes release obsolete results. Function
+  // keys are weak so abandoned render selectors do not stay alive in this cache.
+  let selections: {
+    snapshot: Readonly<T>;
+    values: WeakMap<(value: T) => unknown, { value: unknown }>;
+  } | undefined;
 
   const subscribe = (callback: () => void) => {
     listeners.add(callback);
@@ -139,11 +145,26 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
       // Keep this cache local to the selector so interrupted renders cannot
       // replace the selector or snapshot used by the committed subscription.
       let cached: { snapshot: Readonly<T>; value: R } | undefined;
+      let shareable = false;
       const select = (snapshot: Readonly<T>) => {
         if (cached && Object.is(cached.snapshot, snapshot)) return cached.value;
-        const next = converter(snapshot);
+        if (!selections || !Object.is(selections.snapshot, snapshot)) {
+          selections = { snapshot, values: new WeakMap() };
+        }
+        let selection = selections.values.get(converter);
+        if (!selection) {
+          const values = selections.values;
+          selection = { value: converter(snapshot) };
+          values.set(converter, selection);
+        }
+        const next = selection.value as R;
         const previous = cached || committed.current;
         const value = previous && comparator(previous.value, next) ? previous.value : next;
+        // A changed selector may retain an equal value of a different type from
+        // the previous selector (e.g. boxed/primitive). Keep that history local.
+        if (comparator === isDeepEqual && (shareable ||= Object.is(value, next))) {
+          selection.value = value;
+        }
         if (cached) {
           cached.snapshot = snapshot;
           cached.value = value;
@@ -163,6 +184,16 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
     return value;
   };
 
+  const applyValue = (nextVal: T, partial?: boolean) => {
+    if (partial && typeof nextVal === 'object') {
+      nextVal = { ...currentValue, ...nextVal };
+    }
+    if (comparator(currentValue, nextVal)) return;
+    currentValue = nextVal;
+    selections = undefined;
+    listeners.forEach((listener) => listener());
+  };
+
   function setStore(
     newValue: T | ((prev: T) => T | Promise<T>),
     cfg?: { partial?: false } | false
@@ -177,22 +208,13 @@ export function createStore<T>(initialValue: IInitialState<T>, options?: ICreate
     newValue: any,
     cfg?: ISetStoreOptionsType
   ): void | Promise<void>  {
-    let nextValue = typeof newValue === 'function' ? newValue(currentValue) : newValue;
+    const nextValue = typeof newValue === 'function' ? newValue(currentValue) : newValue;
     const partial = typeof cfg === 'object' ? cfg.partial : cfg;
 
-    const dealWithNewValue = (nextVal: T) => {
-      if (partial && typeof nextVal === 'object') {
-        nextVal = { ...currentValue, ...nextVal };
-      }
-      if (comparator(currentValue, nextVal)) return;
-      currentValue = nextVal;
-      listeners.forEach((listener) => listener());
-    };
-
     if (isPromiseLike(nextValue)) {
-      return nextValue.then(dealWithNewValue);
+      return nextValue.then((value: T) => applyValue(value, partial));
     } else {
-      dealWithNewValue(nextValue);
+      applyValue(nextValue, partial);
     }
   }
 

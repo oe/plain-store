@@ -45,9 +45,9 @@ try {
     readFileSync(join(temporary, 'package/dist/esm/index.mjs'), 'utf8'),
   );
   for (const [path, budget] of [
-    ['dist/esm/index.mjs', 1250],
-    ['dist/cjs/index.js', 1100],
-    ['dist/iife/index.js', 1100],
+    ['dist/esm/index.mjs', 1350],
+    ['dist/cjs/index.js', 1200],
+    ['dist/iife/index.js', 1200],
   ]) {
     const size = gzipSync(readFileSync(join(temporary, 'package', path))).length;
     assert.ok(size <= budget, `${path}: ${size} gzip bytes exceeds the ${budget}-byte budget`);
