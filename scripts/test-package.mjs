@@ -5,6 +5,8 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { runInNewContext } from 'node:vm';
+import { gzipSync } from 'node:zlib';
+import { build } from 'vite';
 
 const require = createRequire(import.meta.url);
 const temporary = mkdtempSync(join(tmpdir(), 'plain-store-package-'));
@@ -42,6 +44,43 @@ try {
     readFileSync(join(temporary, 'package/dist/esm/index.js'), 'utf8'),
     readFileSync(join(temporary, 'package/dist/esm/index.mjs'), 'utf8'),
   );
+  for (const [path, budget] of [
+    ['dist/esm/index.mjs', 1350],
+    ['dist/cjs/index.js', 1200],
+    ['dist/iife/index.js', 1200],
+  ]) {
+    const size = gzipSync(readFileSync(join(temporary, 'package', path))).length;
+    assert.ok(size <= budget, `${path}: ${size} gzip bytes exceeds the ${budget}-byte budget`);
+    console.log(`${path}: ${size}/${budget} gzip bytes (React excluded)`);
+  }
+
+  const application = join(temporary, 'unused.mjs');
+  writeFileSync(application, "import { createStore } from 'plain-store'; console.log('app');");
+  const bundled = await build({
+    configFile: false,
+    root: temporary,
+    logLevel: 'silent',
+    build: {
+      write: false,
+      rollupOptions: { input: application, external: ['react'] },
+    },
+  });
+  for (const output of (Array.isArray(bundled) ? bundled : [bundled])) {
+    const chunks = output.output.filter((item) => item.type === 'chunk');
+    assert.equal(chunks.length, 1);
+    assert.deepEqual(chunks[0].imports, [], 'Unused plain-store import must not retain React');
+  }
+  writeFileSync(application, "import 'plain-store/dist/iife/index.js'; console.log('app');");
+  const browserBundle = await build({
+    configFile: false,
+    root: temporary,
+    logLevel: 'silent',
+    build: { write: false, rollupOptions: { input: application } },
+  });
+  const browserOutputs = Array.isArray(browserBundle) ? browserBundle : [browserBundle];
+  assert.ok(browserOutputs.some((output) => output.output.some((item) =>
+    item.type === 'chunk' && item.code.includes('createStore')
+  )), 'The IIFE initialization must be retained when imported for side effects');
   for (const extension of ['mts', 'cts']) {
     writeFileSync(join(temporary, `consumer.${extension}`), `
       import { createStore } from 'plain-store';
@@ -56,7 +95,7 @@ try {
     '--noEmit', '--strict', '--skipLibCheck', '--module', 'NodeNext',
     '--target', 'ES2020', 'consumer.mts', 'consumer.cts',
   ], { cwd: temporary, stdio: 'inherit' });
-  console.log('Packed CommonJS, ESM, IIFE, and type declarations verified.');
+  console.log('Packed imports, type declarations, size budgets, and unused-import tree shaking verified.');
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }
