@@ -14,6 +14,8 @@ Share UI state between React components and update it from ordinary JavaScript. 
 - **React 18+:** tested on React 18 and 19, including server rendering and hydration.
 - **No extra runtime dependencies:** React is the only peer dependency. The minified CJS/browser build is approximately 1 kB gzipped, excluding React; format and build settings affect size.
 
+ESM builds allow bundlers to remove unused exports and unused package imports. The browser IIFE contains the full library. CI enforces gzip budgets of 1,250 bytes for ESM and 1,100 bytes for CJS/IIFE, excluding React.
+
 ## Installation
 
 ```bash
@@ -220,7 +222,7 @@ yarn dev
 yarn test:watch
 ```
 
-CI checks React 18 and 19, TypeScript, production builds, and the actual package tarball (CommonJS, ESM, browser IIFE, and declaration files). [Examples](https://github.com/oe/plain-store/tree/main/demo) are available in the repository. The demo timing loops are exploratory examples, not comparative performance guarantees.
+CI checks React 18 and 19, TypeScript, production builds, and the actual package tarball (CommonJS, ESM, browser IIFE, and declaration files), including size budgets and removal of unused imports. [Examples](https://github.com/oe/plain-store/tree/main/demo) are available in the repository. The demo timing loops are exploratory examples, not comparative performance guarantees.
 
 ## License
 
