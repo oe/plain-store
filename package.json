@@ -12,7 +12,9 @@
     "test:watch": "vitest --watch",
     "prepublishOnly": "npm test && npm run build && npm run test:package",
     "test:package": "node scripts/test-package.mjs",
-    "benchmark:selectors": "npm run build && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/benchmark-selectors.mjs"
+    "benchmark:selectors": "npm run build && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/benchmark-selectors.mjs",
+    "benchmark:compare": "npm run build && npm ci --prefix benchmarks --ignore-scripts --legacy-peer-deps && node benchmarks/compare.mjs",
+    "benchmark:check": "npm ci --prefix benchmarks --ignore-scripts --legacy-peer-deps && node benchmarks/compare.mjs --check"
   },
   "repository": {
     "type": "git",

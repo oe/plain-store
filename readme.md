@@ -16,6 +16,8 @@ Share UI state between React components and update it from ordinary JavaScript. 
 
 ESM builds allow bundlers to remove unused exports and unused package imports. The browser IIFE contains the full library. CI enforces gzip budgets of 1,250 bytes for ESM and 1,100 bytes for CJS/IIFE, excluding React.
 
+[Compare performance and bundle size with Zustand and Jotai](#benchmarks), including where each configuration fits.
+
 ## Installation
 
 ```bash
@@ -94,6 +96,54 @@ Use it for shared client-side UI state when you prefer a small, explicit store o
 | [TanStack Query](https://tanstack.com/query) | You need server-data fetching, caching, synchronization, and retries. |
 
 Zustand also works without a Provider and exposes an external store API. plain-store's default deep equality is a convenience, not a general speed advantage: comparisons cost work, especially for large values. plain-store does not provide persistence, DevTools, automatic signal dependency tracking, or request caching.
+
+## Benchmarks
+
+plain-store combines **built-in deep equality, suppression of deeply equal writes, and a small API**. The comparison below measures those tradeoffs alongside configured alternatives. It does not establish a universal fastest library.
+
+### Bundle size for equivalent object selections
+
+Minified consumer fixtures expose a selected-state hook and a setter. Values are gzip **bytes**, excluding React and including the equality helpers each configuration needs:
+
+| Configuration | Flat object selection | Deep object selection |
+| --- | ---: | ---: |
+| plain-store, default equality | 1,227 | 1,253 |
+| Zustand/traditional + fast-deep-equal | 2,026 | 2,055 |
+| Zustand + useShallow | 914 | — |
+| Jotai + selectAtom + equality function | 3,823 | 4,432 |
+
+For this deep-selection fixture, plain-store supplies the behavior in about **1.25 kB** without an extra equality dependency. Zustand's shallow-only fixture is smaller; shallow equality does not handle the fresh nested objects in the deep fixture. These numbers measure the fixtures, not whole apps or package download sizes. Build settings and usage affect size.
+
+### Update and selector costs
+
+Snapshot from **2026-10-04**: plain-store 0.10.0, Zustand 5.0.15, Jotai 3.0.1; production React/React DOM 18.3.1, Node 24.19.0, jsdom 30.1.1, Linux x64 on Intel Xeon Platinum 8573C. React cases use 20 mounted subscribers and 500 synchronous updates; lists contain 5,000 items. Times are **median milliseconds**, lower is less time, after two warmup and seven measured rounds with rotated library order:
+
+| Workload | plain-store | Zustand | Jotai |
+| --- | ---: | ---: | ---: |
+| 100,000 writes, one listener, no React | 10.11 | 2.83 | 139.87 |
+| Primitive selection, unrelated updates | 0.64 | 0.39 | 3.11 |
+| Primitive selection, selected updates | 17.27 | 16.43 | 23.52 |
+| Object selection, unrelated updates | 1.25 | 0.88 | 3.94 |
+| Object selection, selected updates | 16.85 | 16.90 | 21.23 |
+| Nested selection, unrelated updates | 2.77 | 2.13 | 2.41 |
+| Uncached list, unrelated updates | 390.40 | 405.49 | 22.93 |
+| Uncached list, filter changes each update | 263.76 | 261.79 | 32.35 |
+| Cached list, unrelated updates | 0.55 | 0.32 | 2.11 |
+| Cached list, filter changes each update | 28.72 | 26.79 | 31.19 |
+
+Zustand uses its native hook for primitives and `traditional` + fast-deep-equal for objects/arrays. The additional `useShallow` flat-object configuration measured 2.38 ms for unrelated updates and 26.42 ms for selected updates; all configurations skip unrelated renders. Jotai shares one selected atom between subscribers, preserving its native calculation sharing. Cached cases give **all three libraries the same application-level cache**.
+
+An observable default behavior is write deduplication: 500 fresh state objects with unchanged contents produced **zero notifications and zero selector calls** in plain-store, versus 500 notifications in Zustand and Jotai. Object selectors ran 10,000 times in Zustand and 500 times in Jotai; none rendered. This diagnostic compares different default write semantics, so it is not included in the timing table. Other libraries can add an equality guard before writing.
+
+The results favor Zustand for raw update overhead and Jotai for shared uncached derivations. plain-store's advantage is getting deep selections and write deduplication by default with a small footprint. The cache recipe below avoids repeated list work, but the same technique benefits other stores. Small timing differences and overlapping quartile ranges do not establish an app-level advantage; Node/jsdom does not measure browser paint or interaction latency.
+
+```sh
+npm run benchmark:compare
+# Optional destination; preserve the checked-in snapshots:
+npm run benchmark:compare -- /tmp/comparison.json
+```
+
+[Methodology and adapters](benchmarks/README.md), [React 18 raw samples and counts](benchmarks/results/react-18.json), and [React 19 results](benchmarks/results/react-19.json) include versions, quartiles, source hashes and machine metadata. CI validates outputs, render/computation counts and bundled imports on React 18/19; timing rankings are not pass/fail checks. The comparison dependencies are isolated from the published library.
 
 ## Large lists and frequent updates
 
