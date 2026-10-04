@@ -1,6 +1,6 @@
 {
   "name": "plain-store",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "A tiny React state store with get/set APIs and deep-equal selectors",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.mjs",

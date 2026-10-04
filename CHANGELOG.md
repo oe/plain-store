@@ -1,11 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.10.1 — 2026-10-04
 
 - Share computations for the same pure selector function within a store's latest selected snapshot. Keep per-hook snapshot/commit isolation and custom comparator histories. With default equality, share stabilized results when they originate from that selector.
 - Clear shared results on accepted writes and use weak function keys. Inline or distinct selector functions do not share calculations; reading older snapshots may recompute them.
 - Move update application into a store-local function so synchronous setters do not allocate a result handler for every write. Async partial updates still merge at resolution time.
-- Add published 0.10.0 as a benchmark baseline and component-local selector cases. Mark the working-tree implementation as unreleased in comparison reports and documentation.
+- Add published 0.10.0 as a benchmark baseline and component-local selector cases. Preserve pre-release comparison snapshots with source hashes and explain their relation to 0.10.1.
+- Add reproducible Zustand/Jotai benchmarks, a cached-list recipe, tree-shaking checks and gzip budgets. Keep comparison dependencies outside the published package.
+- Document the existing `Object.is` option, including write/selector equality tradeoffs; deep equality remains the default.
 - The public declarations, import paths, default deep equality and deprecated aliases remain unchanged. Selector evaluation counts and shared references can change; selectors must be pure and selected values immutable.
 - Shared caching has a small fixed lookup cost for cheap or distinct selectors and retains latest derived results until a write, key collection or store release. The gzip budgets increase by 100 bytes to 1,350 ESM and 1,200 CJS/IIFE to accommodate the measured optimization and compatibility guards.
 
