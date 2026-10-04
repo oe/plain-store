@@ -135,6 +135,8 @@ Snapshot from **2026-10-04**: plain-store PR (unreleased) and npm 0.10.0 baselin
 
 The first row measures allocation of 100,000 fresh `{ count }` objects, equality checks, applying each update and invoking one listener; it includes no React rendering or selector work. With the existing `comparator: Object.is` option, the same working-tree implementation measured **8.99 ms**, compared with **22.03 ms** using default deep equality, **10.62 ms** for npm 0.10.0 with `Object.is`, and **6.91 ms** for Zustand. Reference equality removes much of this workload's comparison cost, but Zustand still has lower setter overhead. This option also changes selector and equal-write behavior; see [reference equality for frequent writes](#reference-equality-for-frequent-writes).
 
+Using the same equality function does not make the setter implementations identical. plain-store still checks for Promise/thenable results to support async updates, handles its partial-update options, and invalidates shared selector results on accepted writes. Zustand's vanilla setter has a shorter synchronous path. No selectors or React components run in this workload, so their computation/render costs do not explain the remaining difference. These implementation differences are possible overhead sources; this benchmark does not measure their individual contributions, and JIT, GC and machine scheduling also affect timings.
+
 Zustand uses its native hook for primitives and `traditional` + fast-deep-equal for objects/arrays. The additional `useShallow` flat-object configuration measured 3.00 ms for unrelated updates and 29.46 ms for selected updates. Jotai shares one selected atom in shared cases and uses component-local atoms in local cases. All configurations skip unrelated renders. Cached-list cases give **every library the same application-level cache**.
 
 The shared uncached-list optimization reduces filtering from **10,000 to 500 operations**. In this run, unrelated updates fell from about 419 to 21 ms, approaching Jotai's shared-atom cost. Changing the filter still renders 10,000 times in every configuration. Distinct component-local selectors do not share work and can be slower because of cache lookups; the table includes that cost. Simple or already cached selectors do not gain uniformly. The library gzip footprint grows by 98–116 bytes over 0.10.0; budgets increase by 100 bytes to preserve a small margin for builds and compatibility guards.
@@ -190,7 +192,7 @@ Run `npm run benchmark:selectors` to compare uncached selectors, cached selector
 
 ## Reference equality for frequent writes
 
-Zustand's default write check uses `Object.is`; plain-store's default deep comparison does more work to suppress updates with equal contents. For frequent immutable updates where that suppression is unnecessary, the existing comparator option selects reference equality:
+**Deep equality remains the default.** It is convenient for object selections and skips whole-state writes with unchanged contents. If profiling shows that comparisons cost too much during frequent immutable updates, opt into `Object.is` to reduce comparison work. This can improve write throughput when selections already have stable references; it does not guarantee fewer renders or better interaction latency.
 
 ```tsx
 const cursor = createStore({ x: 0, y: 0 }, { comparator: Object.is });
@@ -203,7 +205,17 @@ function CursorX() {
 cursor.set({ x: 10, y: 20 });
 ```
 
-This option applies to **both writes and selector results**. Select primitives, existing immutable references, or memoized derived values. A selector returning a fresh `{ x: state.x }` loses default deep stabilization and can cause extra renders. A fresh root object with equal contents also notifies subscribers. Replace changed values rather than mutating them; setting the same reference is ignored. Default deep equality remains the convenient choice for fresh object selections.
+The option applies to **both writes and selector results**:
+
+| Behavior | Default deep equality | `Object.is` |
+| --- | --- | --- |
+| Set a fresh state object with equal contents | Skips the write and notifications | Accepts the write and notifies; `useStore` can rerender |
+| Return a fresh but equal object/array from a selector | Retains the previous selection | Treats it as changed; can rerender on unrelated updates |
+| Select an unchanged primitive or the same object reference | Retains the previous selection | Retains the previous selection |
+
+With `Object.is`, select primitives, existing immutable references, or memoized derived values. Prefer `state => state.x` over `state => ({ x: state.x })` unless the object result is cached. The comparator follows JavaScript's `Object.is` semantics: `NaN` equals `NaN`, while `+0` and `-0` differ; default deep equality treats both zeros as equal.
+
+Both modes require immutable updates. Replace changed objects/arrays rather than mutating the current state; setting the same reference is ignored in both modes. Keep default deep equality when convenient fresh object selections and suppression of equal-content writes matter more than raw write throughput.
 
 ## API
 
