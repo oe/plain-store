@@ -121,7 +121,9 @@ function setters(adapter) {
 const quantile = (values, fraction) => [...values].sort((a, b) => a - b)[Math.floor((values.length - 1) * fraction)];
 const results = [];
 for (const workload of [{ id: 'vanilla/setters' }, ...workloads]) {
-  const participants = adapters.filter((adapter) => !adapter.flatOnly || workload.kind === 'flat');
+  const participants = adapters.filter((adapter) =>
+    (!adapter.vanillaOnly || workload.id === 'vanilla/setters') &&
+    (!adapter.flatOnly || workload.kind === 'flat'));
   const samples = Object.fromEntries(participants.map(({ name }) => [name, []]));
   for (let round = 0; round < config.warmup + config.rounds; round++) {
     // Rotate and reverse order so no library always gets the warmed environment.
@@ -162,7 +164,9 @@ const output = {
       'plain-store 0.10.0': version('plain-store'),
       'fast-deep-equal': version('fast-deep-equal'), 'use-sync-external-store': version('use-sync-external-store') },
     platform: platform(), arch: arch(), cpu: cpus()[0].model, logicalCPUs: cpus().length,
-    sources: { 'plain-store': 'working tree (unreleased)', 'plain-store 0.10.0': 'npm release' },
+    sources: { 'plain-store': 'working tree (unreleased)', 'plain-store 0.10.0': 'npm release',
+      'plain-store/Object.is': 'working tree (unreleased), reference equality',
+      'plain-store 0.10.0/Object.is': 'npm release, reference equality' },
     mode: 'production', environment: 'jsdom', jsdom: version('jsdom'), vite: version('vite'), config,
     gitRevision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: rootDir, encoding: 'utf8' }).trim(),
     sourceHashes: Object.fromEntries(hashedPaths.map((path) => [path, createHash('sha256').update(readFileSync(resolve(rootDir, path))).digest('hex')])),

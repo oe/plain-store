@@ -120,22 +120,24 @@ Snapshot from **2026-10-04**: plain-store PR (unreleased) and npm 0.10.0 baselin
 
 | Workload | plain-store PR | npm 0.10.0 | Zustand | Jotai |
 | --- | ---: | ---: | ---: | ---: |
-| 100,000 writes, one listener, no React | 9.54 | 9.94 | 2.81 | 148.61 |
-| Primitive selection, unrelated updates | 0.66 | 0.64 | 0.30 | 3.10 |
-| Primitive selection, selected updates | 17.53 | 17.30 | 15.10 | 23.95 |
-| Shared object selection, unrelated updates | 0.67 | 1.28 | 0.85 | 2.83 |
-| Shared object selection, selected updates | 19.37 | 17.46 | 18.77 | 24.74 |
-| Component-local object, unrelated updates | 1.91 | 1.16 | 0.84 | 29.91 |
-| Component-local object, selected updates | 22.68 | 24.59 | 20.36 | 55.51 |
-| Shared nested selection, unrelated updates | 0.84 | 3.15 | 2.28 | 2.99 |
-| Shared uncached list, unrelated updates | 21.30 | 386.95 | 398.88 | 21.50 |
-| Shared uncached list, filter changes each update | 28.88 | 262.96 | 262.80 | 33.20 |
-| Cached list, unrelated updates | 0.76 | 0.71 | 0.37 | 2.42 |
-| Cached list, filter changes each update | 30.08 | 28.78 | 29.10 | 35.45 |
+| 100,000 writes, one listener, no React | 22.03 | 21.56 | 6.91 | 315.62 |
+| Primitive selection, unrelated updates | 2.30 | 0.50 | 0.34 | 6.83 |
+| Primitive selection, selected updates | 19.44 | 17.32 | 16.11 | 24.56 |
+| Shared object selection, unrelated updates | 0.68 | 1.26 | 0.83 | 2.67 |
+| Shared object selection, selected updates | 23.00 | 18.12 | 18.04 | 25.14 |
+| Component-local object, unrelated updates | 2.10 | 1.39 | 0.85 | 36.41 |
+| Component-local object, selected updates | 29.15 | 22.94 | 30.66 | 61.18 |
+| Shared nested selection, unrelated updates | 0.83 | 3.23 | 2.34 | 2.79 |
+| Shared uncached list, unrelated updates | 20.97 | 418.69 | 435.29 | 25.30 |
+| Shared uncached list, filter changes each update | 35.57 | 296.36 | 292.41 | 36.09 |
+| Cached list, unrelated updates | 0.78 | 0.59 | 0.39 | 2.94 |
+| Cached list, filter changes each update | 29.61 | 31.87 | 32.48 | 36.04 |
 
-Zustand uses its native hook for primitives and `traditional` + fast-deep-equal for objects/arrays. The additional `useShallow` flat-object configuration measured 2.25 ms for unrelated updates and 25.97 ms for selected updates. Jotai shares one selected atom in shared cases and uses component-local atoms in local cases. All configurations skip unrelated renders. Cached-list cases give **every library the same application-level cache**.
+The first row measures allocation of 100,000 fresh `{ count }` objects, equality checks, applying each update and invoking one listener; it includes no React rendering or selector work. With the existing `comparator: Object.is` option, the same working-tree implementation measured **8.99 ms**, compared with **22.03 ms** using default deep equality, **10.62 ms** for npm 0.10.0 with `Object.is`, and **6.91 ms** for Zustand. Reference equality removes much of this workload's comparison cost, but Zustand still has lower setter overhead. This option also changes selector and equal-write behavior; see [reference equality for frequent writes](#reference-equality-for-frequent-writes).
 
-The shared uncached-list optimization reduces filtering from **10,000 to 500 operations**. In this run, unrelated updates fell from about 387 to 21 ms, approaching Jotai's shared-atom cost. Changing the filter still renders 10,000 times in every configuration. Distinct component-local selectors do not share work and can be slower because of cache lookups; the table includes that cost. Simple or already cached selectors do not gain uniformly. The library gzip footprint grows by 98–116 bytes over 0.10.0; budgets increase by 100 bytes to preserve a small margin for builds and compatibility guards.
+Zustand uses its native hook for primitives and `traditional` + fast-deep-equal for objects/arrays. The additional `useShallow` flat-object configuration measured 3.00 ms for unrelated updates and 29.46 ms for selected updates. Jotai shares one selected atom in shared cases and uses component-local atoms in local cases. All configurations skip unrelated renders. Cached-list cases give **every library the same application-level cache**.
+
+The shared uncached-list optimization reduces filtering from **10,000 to 500 operations**. In this run, unrelated updates fell from about 419 to 21 ms, approaching Jotai's shared-atom cost. Changing the filter still renders 10,000 times in every configuration. Distinct component-local selectors do not share work and can be slower because of cache lookups; the table includes that cost. Simple or already cached selectors do not gain uniformly. The library gzip footprint grows by 98–116 bytes over 0.10.0; budgets increase by 100 bytes to preserve a small margin for builds and compatibility guards.
 
 Default write deduplication is unchanged: 500 fresh root objects with unchanged contents produce **zero notifications and zero selector calls** in both plain-store versions, versus 500 notifications in Zustand and Jotai. Object selectors run 10,000 times in Zustand and 500 times in Jotai; none renders. This diagnostic compares different default write semantics, so it is not included in the timing table. Other libraries can add an equality guard before writing.
 
@@ -182,9 +184,26 @@ store.set({ filter: 'done' }, true); // recomputes once, shared by subscribers
 
 Keep every dependency in the cache key, including props if the calculation uses them. Replace changed arrays and items rather than mutating them. Do not mutate the selected array. The cache retains only the latest inputs and result; reading an older snapshot recomputes it correctly. Create a separate store and selector per server request. [The runnable recipe](demo/large-state.ts) includes these types and supports the existing comparator option.
 
-The default comparator still works with this pattern and skips comparing a cached array's contents when its reference is unchanged. For workloads where whole-state deep comparisons remain costly, `{ comparator: Object.is }` is an opt-in alternative. It also changes selector equality: newly allocated but equivalent objects can render, and fresh state objects can notify even when their contents are equal. Use stable selections and avoid unnecessary writes. For multiple related field changes, prefer a single `set` call to notify subscribers once.
+The default comparator still works with this pattern and skips comparing a cached array's contents when its reference is unchanged. For multiple related field changes, prefer a single `set` call to notify subscribers once.
 
 Run `npm run benchmark:selectors` to compare uncached selectors, cached selectors with default equality, and cached selectors with `Object.is`. It uses the production build with 5,000 items, 20 mounted subscribers, and 500 synchronous updates, checks output/render/computation counts, and reports medians after warmup. The benchmark also changes the filter on every update to measure the case where recomputation is necessary. Node/jsdom timings are local diagnostics, not browser performance guarantees.
+
+## Reference equality for frequent writes
+
+Zustand's default write check uses `Object.is`; plain-store's default deep comparison does more work to suppress updates with equal contents. For frequent immutable updates where that suppression is unnecessary, the existing comparator option selects reference equality:
+
+```tsx
+const cursor = createStore({ x: 0, y: 0 }, { comparator: Object.is });
+
+function CursorX() {
+  const x = cursor.useSelector((state) => state.x); // a primitive selection
+  return <span>{x}</span>;
+}
+
+cursor.set({ x: 10, y: 20 });
+```
+
+This option applies to **both writes and selector results**. Select primitives, existing immutable references, or memoized derived values. A selector returning a fresh `{ x: state.x }` loses default deep stabilization and can cause extra renders. A fresh root object with equal contents also notifies subscribers. Replace changed values rather than mutating them; setting the same reference is ignored. Default deep equality remains the convenient choice for fresh object selections.
 
 ## API
 

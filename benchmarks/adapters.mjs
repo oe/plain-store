@@ -41,6 +41,20 @@ export const adapters = [
     },
   },
   {
+    name: 'plain-store/Object.is',
+    vanillaOnly: true,
+    create(initial) {
+      return createPlainStore(initial, { comparator: Object.is });
+    },
+  },
+  {
+    name: 'plain-store 0.10.0/Object.is',
+    vanillaOnly: true,
+    create(initial) {
+      return createBaselineStore(initial, { comparator: Object.is });
+    },
+  },
+  {
     name: 'Zustand',
     create(initial, select, kind) {
       const store = createZustandStore(() => initial);
