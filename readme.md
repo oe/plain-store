@@ -95,6 +95,43 @@ Use it for shared client-side UI state when you prefer a small, explicit store o
 
 Zustand also works without a Provider and exposes an external store API. plain-store's default deep equality is a convenience, not a general speed advantage: comparisons cost work, especially for large values. plain-store does not provide persistence, DevTools, automatic signal dependency tracking, or request caching.
 
+## Large lists and frequent updates
+
+Skipping a render does not skip selector computation. A selector such as `state.todos.filter(...)` still scans the list on every accepted update, even when only an unrelated field changes. `useCallback` stabilizes a selector function; it does not cache its derived result across changed snapshots.
+
+For expensive derivations, cache one result by the inputs it actually uses. Create the selector once alongside its store, and share it between components that need the same result:
+
+```ts
+type Todo = { id: number; done: boolean };
+type State = { todos: Todo[]; filter: 'all' | 'active' | 'done'; progress: number };
+
+function createTodoStore(initialState: State) {
+  let cached: { todos: Todo[]; filter: State['filter']; result: Todo[] } | undefined;
+  const selectVisibleTodos = ({ todos, filter }: State) => {
+    if (cached && cached.todos === todos && cached.filter === filter) return cached.result;
+    const result = filter === 'all'
+      ? todos : todos.filter((todo) => todo.done === (filter === 'done'));
+    cached = { todos, filter, result };
+    return result;
+  };
+  return { store: createStore(initialState), selectVisibleTodos };
+}
+
+const { store, selectVisibleTodos } = createTodoStore({
+  todos: [{ id: 1, done: false }], filter: 'active', progress: 0,
+});
+// Inside a component:
+// const visibleTodos = store.useSelector(selectVisibleTodos);
+store.set({ progress: 1 }, true); // reuses the selected array; no filtering
+store.set({ filter: 'done' }, true); // recomputes once, shared by subscribers
+```
+
+Keep every dependency in the cache key, including props if the calculation uses them. Replace changed arrays and items rather than mutating them. Do not mutate the selected array. The cache retains only the latest inputs and result; reading an older snapshot recomputes it correctly. Create a separate store and selector per server request. [The runnable recipe](demo/large-state.ts) includes these types and supports the existing comparator option.
+
+The default comparator still works with this pattern and skips comparing a cached array's contents when its reference is unchanged. For workloads where whole-state deep comparisons remain costly, `{ comparator: Object.is }` is an opt-in alternative. It also changes selector equality: newly allocated but equivalent objects can render, and fresh state objects can notify even when their contents are equal. Use stable selections and avoid unnecessary writes. For multiple related field changes, prefer a single `set` call to notify subscribers once.
+
+Run `npm run benchmark:selectors` to compare uncached selectors, cached selectors with default equality, and cached selectors with `Object.is`. It uses the production build with 5,000 items, 20 mounted subscribers, and 500 synchronous updates, checks output/render/computation counts, and reports medians after warmup. The benchmark also changes the filter on every update to measure the case where recomputation is necessary. Node/jsdom timings are local diagnostics, not browser performance guarantees.
+
 ## API
 
 ### `createStore(initialState, options?)`

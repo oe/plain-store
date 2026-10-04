@@ -50,3 +50,24 @@ The generated public declarations match the published 0.9.0 declarations exactly
 A local production-mode comparison on Node.js 24.19.0, React 18.3.1, and jsdom tested both published 0.9.0 and the new CJS build. Seven measured rounds followed two warmup rounds, alternating version order. With 50 subscribers and 1,000 synchronous updates, unrelated updates caused zero component renders for both versions. Changed snapshots evaluated stable selectors 100,000 times in 0.9.0 versus 50,000 in 0.10.0. In this synthetic run, trivial selected updates took about 71 versus 76 ms, while selectors deriving 200 values took about 1,086 versus 576 ms. These measurements show the fixed safety overhead and avoided duplicate work; they are not browser benchmarks or universal performance claims.
 
 The review retains the concurrency/SSR fixes and narrowly scoped comparator repairs. It adds no state-management features, persistence layer, signal engine, or general-purpose equality framework. SSR retains the initial snapshot until the store is released, which is documented in the changelog.
+
+## Large-state optimization — 2026-10-04
+
+The costly case is repeated derivation, not just rendering. Every subscriber still evaluates its selector for an accepted snapshot. Filtering a large immutable list allocates a new result and forces default equality to walk that result, even when an unrelated progress field changes.
+
+Add an application-level recipe in `demo/large-state.ts`, with one cached result keyed by the list reference and filter. Sharing that selector within its store avoids duplicate filtering between subscribers and returns a stable selected reference. Keep the runtime implementation, default comparator, public API, and declarations unchanged. No dependency or automatic memoization layer is added to the package. The example cache holds only the latest list/result, requires immutable inputs, and is created separately for each store/request. Reading an older snapshot safely recomputes its result.
+
+`npm run benchmark:selectors` builds the library and measures the actual ESM build against that recipe. On Node.js 24.19.0 in production-mode React with jsdom, each sample mounts 20 subscribers, uses 5,000 items and 500 synchronous updates, and verifies output, render, selector, and derivation counts. Five measured rounds follow two warmup rounds; case order alternates. Timing is diagnostic, not a CI threshold or browser performance claim.
+
+| React / workload | Uncached, default (ms) | Cached, default (ms) | Cached, Object.is (ms) |
+| --- | ---: | ---: | ---: |
+| 18.3.1 / unrelated updates | 414.31 | 0.94 | 0.52 |
+| 18.3.1 / filter changes each update | 259.88 | 42.78 | 42.45 |
+| 19.3.0 / unrelated updates | 387.96 | 0.73 | 0.55 |
+| 19.3.0 / filter changes each update | 258.19 | 45.65 | 44.95 |
+
+Each case still evaluates selectors 10,000 times. Unrelated updates produce no component renders in either version, but caching reduces filtering from 10,000 operations to zero after mounting. When the filter changes every time, filtering drops from 10,000 to 500 operations and both cases render 10,000 times. This isolates avoided computations rather than attributing batched renders to an optimization.
+
+The existing `Object.is` comparator is optional, not required for the main improvement. It changes equality semantics for newly allocated equivalent state/selection objects, so the README explains stable references and unnecessary writes. The recipe does not cache arbitrary selector dependencies or track mutations automatically.
+
+Validation covers 53 tests on React 18/19, including changed inputs, shared subscribers, request isolation, old snapshots, SSR hydration, and an interrupted Suspense render that replaces the shared cache. Build and packed-package checks preserve legacy imports and public declarations. Gzip sizes remain ESM 1,151, CJS 1,005, and IIFE 1,003 bytes, excluding React, within the existing budgets. The example and benchmark are not included in the runtime `dist` files.
